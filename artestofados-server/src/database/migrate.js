@@ -2,8 +2,11 @@ const { pool } = require('../config/database');
 
 const migrations = [
   `
+  CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
+  `,
+  `
   CREATE TABLE IF NOT EXISTS clientes (
-    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     nome VARCHAR(255) NOT NULL,
     telefone VARCHAR(20) UNIQUE NOT NULL,
     email VARCHAR(255),
@@ -12,7 +15,7 @@ const migrations = [
   `,
   `
   CREATE TABLE IF NOT EXISTS ordens_servico (
-    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     numero_os SERIAL UNIQUE NOT NULL,
     cliente_id UUID REFERENCES clientes(id) ON DELETE CASCADE,
     prazo_entrega DATE NOT NULL,
@@ -29,7 +32,7 @@ const migrations = [
   `,
   `
   CREATE TABLE IF NOT EXISTS itens_os (
-    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     os_id UUID REFERENCES ordens_servico(id) ON DELETE CASCADE,
     quantidade INTEGER NOT NULL,
     descricao TEXT NOT NULL,
@@ -41,7 +44,7 @@ const migrations = [
   `,
   `
   CREATE TABLE IF NOT EXISTS sessoes_chatbot (
-    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     telefone VARCHAR(20) NOT NULL,
     etapa VARCHAR(50) DEFAULT 'inicio',
     tipo_servico VARCHAR(20),
@@ -85,12 +88,16 @@ async function runMigrations() {
     throw error;
   } finally {
     client.release();
-    await pool.end();
   }
 }
 
 if (require.main === module) {
-  runMigrations();
+  runMigrations().then(() => {
+    process.exit(0);
+  }).catch((error) => {
+    console.error('Erro fatal:', error);
+    process.exit(1);
+  });
 }
 
 module.exports = { runMigrations };
