@@ -1,0 +1,46 @@
+version: '3.8'
+
+services:
+  postgres:
+    image: postgres:15-alpine
+    container_name: artestofados-db
+    environment:
+      POSTGRES_DB: artestofados
+      POSTGRES_USER: artestofados_user
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-changeme123}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
+    networks:
+      - artestofados-network
+    restart: unless-stopped
+
+  api:
+    build: .
+    container_name: artestofados-api
+    depends_on:
+      - postgres
+    environment:
+      NODE_ENV: production
+      PORT: 3000
+      DATABASE_URL: postgresql://artestofados_user:${DB_PASSWORD:-changeme123}@postgres:5432/artestofados
+      OPENAI_API_KEY: ${OPENAI_API_KEY}
+      GOOGLE_CALENDAR_CLIENT_ID: ${GOOGLE_CALENDAR_CLIENT_ID}
+      GOOGLE_CALENDAR_CLIENT_SECRET: ${GOOGLE_CALENDAR_CLIENT_SECRET}
+      GOOGLE_CALENDAR_REFRESH_TOKEN: ${GOOGLE_CALENDAR_REFRESH_TOKEN}
+    volumes:
+      - ./uploads:/app/uploads
+      - ./sessions:/app/sessions
+    ports:
+      - "3000:3000"
+    networks:
+      - artestofados-network
+    restart: unless-stopped
+
+volumes:
+  postgres_data:
+
+networks:
+  artestofados-network:
+    driver: bridge

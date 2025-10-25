@@ -1,0 +1,44 @@
+.app {
+  display: flex;
+  height: 100vh;
+  overflow: hidden;
+  background-color: #ecf0f1;
+}
+
+.main-content {
+  flex: 1;
+  margin-left: 250px;
+  overflow-y: auto;
+  background-color: #ecf0f1;
+  min-height: 100vh;
+}
+
+/* Scrollbar personalizada para o conteúdo principal */
+.main-content::-webkit-scrollbar {
+  width: 10px;
+}
+
+.main-content::-webkit-scrollbar-track {
+  background: #f1f1f1;
+}
+
+.main-content::-webkit-scrollbar-thumb {
+  background: #888;
+  border-radius: 5px;
+}
+
+.main-content::-webkit-scrollbar-thumb:hover {
+  background: #555;
+}
+
+@media (max-width: 768px) {
+  .main-content {
+    margin-left: 80px;
+  }
+}
+
+@media (max-width: 480px) {
+  .main-content {
+    margin-left: 0;
+  }
+}
