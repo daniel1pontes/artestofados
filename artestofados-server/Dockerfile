@@ -19,6 +19,8 @@ RUN npm ci --only=production
 
 COPY . .
 
+RUN mkdir -p uploads sessions
+
 EXPOSE 3000
 
 CMD ["npm", "start"]

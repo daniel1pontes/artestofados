@@ -1,5 +1,5 @@
-const whatsappService = require('../services/whatsapp');
-const SessaoChatbot = require('../models/SessaoChatbot');
+const whatsappService = require("../services/whatsapp");
+const SessaoChatbot = require("../models/sessaoChatbot");
 
 class ChatbotController {
   async connect(req, res) {
@@ -7,7 +7,7 @@ class ChatbotController {
       if (whatsappService.isReady) {
         return res.json({
           success: false,
-          message: 'WhatsApp já está conectado'
+          message: "WhatsApp já está conectado",
         });
       }
 
@@ -15,14 +15,14 @@ class ChatbotController {
 
       res.json({
         success: true,
-        message: 'Inicializando conexão. Aguarde o QR Code.'
+        message: "Inicializando conexão. Aguarde o QR Code.",
       });
     } catch (error) {
-      console.error('Erro ao conectar WhatsApp:', error);
+      console.error("Erro ao conectar WhatsApp:", error);
       res.status(500).json({
         success: false,
-        message: 'Erro ao conectar WhatsApp',
-        error: error.message
+        message: "Erro ao conectar WhatsApp",
+        error: error.message,
       });
     }
   }
@@ -34,14 +34,14 @@ class ChatbotController {
       res.json({
         success: true,
         qrCode: status.qrCode,
-        isReady: status.isReady
+        isReady: status.isReady,
       });
     } catch (error) {
-      console.error('Erro ao obter QR Code:', error);
+      console.error("Erro ao obter QR Code:", error);
       res.status(500).json({
         success: false,
-        message: 'Erro ao obter QR Code',
-        error: error.message
+        message: "Erro ao obter QR Code",
+        error: error.message,
       });
     }
   }
@@ -52,14 +52,14 @@ class ChatbotController {
 
       res.json({
         success: true,
-        message: 'WhatsApp desconectado com sucesso'
+        message: "WhatsApp desconectado com sucesso",
       });
     } catch (error) {
-      console.error('Erro ao desconectar WhatsApp:', error);
+      console.error("Erro ao desconectar WhatsApp:", error);
       res.status(500).json({
         success: false,
-        message: 'Erro ao desconectar WhatsApp',
-        error: error.message
+        message: "Erro ao desconectar WhatsApp",
+        error: error.message,
       });
     }
   }
@@ -70,13 +70,13 @@ class ChatbotController {
 
       res.json({
         success: true,
-        message: 'Atendimento pausado'
+        message: "Atendimento pausado",
       });
     } catch (error) {
       res.status(500).json({
         success: false,
-        message: 'Erro ao pausar atendimento',
-        error: error.message
+        message: "Erro ao pausar atendimento",
+        error: error.message,
       });
     }
   }
@@ -87,13 +87,13 @@ class ChatbotController {
 
       res.json({
         success: true,
-        message: 'Atendimento retomado'
+        message: "Atendimento retomado",
       });
     } catch (error) {
       res.status(500).json({
         success: false,
-        message: 'Erro ao retomar atendimento',
-        error: error.message
+        message: "Erro ao retomar atendimento",
+        error: error.message,
       });
     }
   }
@@ -104,13 +104,13 @@ class ChatbotController {
 
       res.json({
         success: true,
-        status
+        status,
       });
     } catch (error) {
       res.status(500).json({
         success: false,
-        message: 'Erro ao obter status',
-        error: error.message
+        message: "Erro ao obter status",
+        error: error.message,
       });
     }
   }
@@ -121,14 +121,14 @@ class ChatbotController {
 
       res.json({
         success: true,
-        sessions
+        sessions,
       });
     } catch (error) {
-      console.error('Erro ao listar sessões:', error);
+      console.error("Erro ao listar sessões:", error);
       res.status(500).json({
         success: false,
-        message: 'Erro ao listar sessões',
-        error: error.message
+        message: "Erro ao listar sessões",
+        error: error.message,
       });
     }
   }

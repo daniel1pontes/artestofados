@@ -1,7 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const osController = require('../controllers/os');
-const upload = require('../middleware/upload');
+const upload = require('../middleware/uploads');
 
 router.post('/', upload.single('imagem_projeto'), osController.create);
 router.get('/', osController.list);
