@@ -29,7 +29,17 @@ export default function Users() {
   const [editingUser, setEditingUser] = useState<User | null>(null);
   const queryClient = useQueryClient();
 
-  const { data, isLoading } = useQuery<PaginatedResponse<User>>({
+  interface UsersResponse {
+    users: User[];
+    pagination: {
+      page: number;
+      limit: number;
+      total: number;
+      pages: number;
+    };
+  }
+
+  const { data, isLoading } = useQuery<UsersResponse>({
     queryKey: ["users", page, search],
     queryFn: async () => {
       const params = new URLSearchParams({
@@ -198,7 +208,7 @@ export default function Users() {
                   </tr>
                 </thead>
                 <tbody className="bg-white divide-y divide-gray-200">
-                  {data?.users?.map((user) => (
+                  {data?.users?.map((user: User) => (
                     <tr key={user.id} className="hover:bg-gray-50">
                       <td className="px-6 py-4 whitespace-nowrap">
                         <div className="text-sm font-medium text-gray-900">
