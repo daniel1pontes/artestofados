@@ -711,8 +711,10 @@ OPENAI_API_KEY=sua-chave-aqui
 
 **Configuração:**
 ```env
-GOOGLE_SERVICE_ACCOUNT_KEY_FILE=./google-credentials-account.json
+GOOGLE_API_CREDENTIALS={"type":"service_account","project_id":"...","private_key":"...","client_email":"..."}
 ```
+
+**Nota:** Cole o conteúdo completo do arquivo `google-credentials-account.json` na variável `GOOGLE_API_CREDENTIALS` em uma única linha.
 
 ### 3. WhatsApp Web.js
 
@@ -838,4 +840,6 @@ Para dúvidas ou suporte:
 
 **Última atualização:** 2024-12-04  
 **Versão do Sistema:** 1.0.0
+
+
 

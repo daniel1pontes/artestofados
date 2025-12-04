@@ -1,5 +1,3 @@
-import fs from "fs";
-import path from "path";
 import { google } from "googleapis";
 import { AppointmentType } from "@prisma/client";
 import { config } from "../config/environment";
@@ -36,25 +34,20 @@ class GoogleCalendarService {
 
   private initialize(): void {
     try {
-      const keyFile = this.resolveCredentialsPath();
+      const credentials = config.google.credentials;
 
-      if (!keyFile) {
+      if (!credentials) {
         this.logger.warn(
           "⚠️ Credenciais do Google Calendar não configuradas. " +
-          "Configure GOOGLE_SERVICE_ACCOUNT_KEY_FILE ou GOOGLE_APPLICATION_CREDENTIALS no arquivo .env",
-          {
-            envVar: config.google.serviceAccountKeyFile || "não definida",
-          }
+          "Configure GOOGLE_API_CREDENTIALS no arquivo .env com o JSON das credenciais",
         );
         return;
       }
 
-      this.logger.info("Inicializando Google Calendar", {
-        keyFile,
-      });
+      this.logger.info("Inicializando Google Calendar");
 
       const auth = new google.auth.GoogleAuth({
-        keyFile,
+        credentials,
         scopes: ["https://www.googleapis.com/auth/calendar"],
       });
 
@@ -64,16 +57,14 @@ class GoogleCalendarService {
       });
 
       this.logger.info("Google Calendar inicializado com sucesso", {
-        keyFile,
+        projectId: credentials.project_id,
+        clientEmail: credentials.client_email,
       });
     } catch (error) {
       const errorObj = this.toError(error);
       this.logger.error(
         "Falha ao inicializar Google Calendar",
         errorObj,
-        {
-          keyFile: config.google.serviceAccountKeyFile,
-        }
       );
       this.calendar = null;
     }
@@ -83,9 +74,7 @@ class GoogleCalendarService {
     payload: AppointmentPayload
   ): Promise<CalendarEvent | null> {
     if (!this.calendar) {
-      this.logger.warn("Google Calendar não configurado. Verifique as credenciais.", {
-        keyFile: config.google.serviceAccountKeyFile,
-      });
+      this.logger.warn("Google Calendar não configurado. Verifique as credenciais no arquivo .env.");
       return null;
     }
 
@@ -299,52 +288,6 @@ class GoogleCalendarService {
     return lines.join("\n");
   }
 
-  private resolveCredentialsPath(): string | null {
-    const keyFile = config.google.serviceAccountKeyFile;
-
-    if (!keyFile) {
-      this.logger.warn("Variável GOOGLE_SERVICE_ACCOUNT_KEY_FILE não configurada");
-      return null;
-    }
-
-    // Tenta resolver o caminho de várias formas
-    let absolutePath: string;
-
-    if (path.isAbsolute(keyFile)) {
-      absolutePath = keyFile;
-    } else {
-      // Primeiro tenta a partir do diretório atual
-      absolutePath = path.join(process.cwd(), keyFile);
-      
-      // Se não existir, tenta a partir do diretório do backend
-      if (!fs.existsSync(absolutePath)) {
-        const backendPath = path.join(__dirname, "..", keyFile);
-        if (fs.existsSync(backendPath)) {
-          absolutePath = backendPath;
-        }
-      }
-    }
-
-    if (!fs.existsSync(absolutePath)) {
-      this.logger.error(
-        `Arquivo de credenciais Google não encontrado`,
-        undefined,
-        {
-          keyFile,
-          absolutePath,
-          cwd: process.cwd(),
-          __dirname: __dirname,
-        }
-      );
-      return null;
-    }
-
-    this.logger.info("Arquivo de credenciais Google encontrado", {
-      absolutePath,
-    });
-
-    return absolutePath;
-  }
 
   private toError(error: unknown): Error | undefined {
     if (error instanceof Error) {
