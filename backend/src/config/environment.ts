@@ -1,0 +1,74 @@
+import dotenv from "dotenv";
+import { z } from "zod";
+
+// Carrega as variáveis de ambiente do arquivo .env
+dotenv.config();
+
+// Esquema de validação das variáveis de ambiente
+const envSchema = z.object({
+  NODE_ENV: z
+    .enum(["development", "production", "test"])
+    .default("development"),
+  PORT: z.string().default("3001"),
+  DATABASE_URL: z.string().min(1, "DATABASE_URL is required"),
+  JWT_SECRET: z
+    .string()
+    .min(32, "JWT_SECRET must be at least 32 characters long"),
+  JWT_EXPIRES_IN: z.string().default("7d"),
+  WHATSAPP_SESSION_PATH: z.string().default("./whatsapp-sessions"),
+  OPENAI_API_KEY: z.string().optional(),
+  GOOGLE_API_CREDENTIALS: z.string().optional(),
+  FRONTEND_URL: z.string().default("http://localhost:3000"),
+  // Adicione outras variáveis de ambiente conforme necessário
+});
+
+type EnvVariables = z.infer<typeof envSchema>;
+
+declare global {
+  namespace NodeJS {
+    interface ProcessEnv extends EnvVariables {}
+  }
+}
+
+export function validateConfig() {
+  try {
+    // Valida as variáveis de ambiente
+    const envVars = envSchema.parse(process.env);
+
+    // Retorna as variáveis de ambiente validadas
+    return {
+      nodeEnv: envVars.NODE_ENV,
+      port: parseInt(envVars.PORT, 10) || 3001,
+      database: {
+        url: envVars.DATABASE_URL,
+      },
+      jwt: {
+        secret: envVars.JWT_SECRET,
+        expiresIn: envVars.JWT_EXPIRES_IN,
+      },
+      whatsapp: {
+        sessionPath: envVars.WHATSAPP_SESSION_PATH,
+      },
+      openai: {
+        apiKey: envVars.OPENAI_API_KEY,
+      },
+      google: {
+        credentials: envVars.GOOGLE_API_CREDENTIALS
+          ? JSON.parse(envVars.GOOGLE_API_CREDENTIALS)
+          : null,
+      },
+      frontendUrl: envVars.FRONTEND_URL,
+    };
+  } catch (error) {
+    if (error instanceof z.ZodError) {
+      console.error("❌ Invalid environment variables:", error.errors);
+    } else {
+      console.error("❌ Failed to validate environment variables:", error);
+    }
+    process.exit(1);
+  }
+}
+
+export const config = validateConfig();
+
+export default config;

@@ -1,0 +1,167 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id        String   @id @default(cuid())
+  email     String   @unique
+  name      String
+  password  String
+  role      UserRole @default(ATTENDANT)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  createdAppointments  Appointment[] @relation("CreatedBy")
+  lastEditedAppointments Appointment[] @relation("LastEditedBy")
+  createdOS           OrderService[] @relation("OSCreatedBy")
+  lastEditedOS        OrderService[] @relation("OSLastEditedBy")
+  createdSessions     Session[]      @relation("SessionCreatedBy")
+  createdMessages     Message[]      @relation("MessageCreatedBy")
+
+  @@map("users")
+}
+
+model Session {
+  id        String   @id @default(cuid())
+  phoneNumber String  @unique
+  state     String   @default("initial")
+  metadata  Json?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  createdBy String
+
+  messages Message[]
+  createdByUser User @relation("SessionCreatedBy", fields: [createdBy], references: [id])
+
+  @@map("sessions")
+}
+
+model Message {
+  id          String   @id @default(cuid())
+  sessionId   String
+  fromNumber  String
+  body        String
+  timestamp   DateTime
+  messageType String   @default("text")
+  hasMedia    Boolean  @default(false)
+  mediaUrl    String?
+  createdAt   DateTime @default(now())
+  createdBy   String
+
+  session Session @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  createdByUser User @relation("MessageCreatedBy", fields: [createdBy], references: [id])
+
+  @@map("messages")
+}
+
+model Appointment {
+  id            String           @id @default(cuid())
+  clientName    String
+  clientPhone   String
+  type          AppointmentType
+  start         DateTime
+  end           DateTime
+  gcalEventId   String?
+  meetLink      String?
+  createdAt     DateTime         @default(now())
+  updatedAt     DateTime         @updatedAt
+  createdBy     String
+  lastEditedBy  String
+
+  createdByUser   User @relation("CreatedBy", fields: [createdBy], references: [id])
+  lastEditedByUser User @relation("LastEditedBy", fields: [lastEditedBy], references: [id])
+
+  @@map("appointments")
+}
+
+model OrderService {
+  id           String    @id @default(cuid())
+  clientName   String
+  clientPhone  String
+  clientEmail     String?
+  clientAddress   String?
+  deliveryDeadline DateTime?
+  paymentMethod   String?
+  discount        Float     @default(0)
+  total           Float
+  status          OSStatus  @default(PENDING)
+  pdfPath         String?
+  images          Json?      // Array de objetos com dados das imagens (base64, originalname, mimetype)
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+  createdBy       String
+  lastEditedBy    String
+
+  createdByUser    User @relation("OSCreatedBy", fields: [createdBy], references: [id])
+  lastEditedByUser  User @relation("OSLastEditedBy", fields: [lastEditedBy], references: [id])
+
+  items       OrderItem[]
+
+  @@map("order_services")
+}
+
+model OrderItem {
+  id         String @id @default(cuid())
+  name       String
+  quantity   Int
+  unitValue  Float
+  total      Float
+  osId       String
+
+  orderService OrderService @relation(fields: [osId], references: [id], onDelete: Cascade)
+
+  @@map("order_items")
+}
+
+model WhatsappConn {
+  id          String           @id @default(cuid())
+  status      WhatsappStatus   @default(DISCONNECTED)
+  qrCode      String?
+  phone       String?
+  connectedAt DateTime?
+  createdAt   DateTime         @default(now())
+  updatedAt   DateTime         @updatedAt
+
+  @@map("whatsapp_connections")
+}
+
+model AuditLog {
+  id        String     @id @default(cuid())
+  entity    String
+  entityId  String
+  action    String
+  oldValues Json?
+  newValues Json?
+  userId    String
+  createdAt DateTime   @default(now())
+
+  @@map("audit_logs")
+}
+
+enum UserRole {
+  ADMIN
+  ATTENDANT
+}
+
+enum AppointmentType {
+  ONLINE
+  IN_STORE
+}
+
+enum OSStatus {
+  PENDING
+  APPROVED
+  REJECTED
+  COMPLETED
+}
+
+enum WhatsappStatus {
+  CONNECTED
+  DISCONNECTED
+  PAUSED
+}
