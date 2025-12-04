@@ -102,6 +102,17 @@ Na raiz do projeto:
 - `npm start` - Inicia o servidor de produção (após o build)
 - `npm test` - Executa os testes
 
+## 📚 Documentação
+
+Para uma documentação completa e detalhada do projeto, incluindo:
+- Arquitetura do sistema
+- Fluxos de funcionamento
+- APIs e endpoints
+- Modelo de dados
+- Integrações
+
+Consulte: **[DOCUMENTACAO_COMPLETA.md](./DOCUMENTACAO_COMPLETA.md)**
+
 ## 🔧 Estrutura do Projeto
 
 ```
