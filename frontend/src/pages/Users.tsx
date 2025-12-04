@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { api, PaginatedResponse } from "../services/api";
+import { api } from "../services/api";
 import toast from "react-hot-toast";
 import {
   Plus,
