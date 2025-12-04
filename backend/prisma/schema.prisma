@@ -67,7 +67,12 @@ model Appointment {
   start         DateTime
   end           DateTime
   gcalEventId   String?
+  gcalCalendarId String?
+  gcalStatus    String?
+  gcalSyncedAt  DateTime?
   meetLink      String?
+  notes         String?
+  status        AppointmentStatus @default(SCHEDULED)
   createdAt     DateTime         @default(now())
   updatedAt     DateTime         @updatedAt
   createdBy     String
@@ -164,4 +169,57 @@ enum WhatsappStatus {
   CONNECTED
   DISCONNECTED
   PAUSED
+}
+
+enum AppointmentStatus {
+  SCHEDULED
+  CONFIRMED
+  CANCELLED
+  COMPLETED
+  NO_SHOW
+}
+
+enum ConversationState {
+  INTRO
+  ASKING_NAME
+  ASKING_SERVICE
+  ASKING_APPOINTMENT_TYPE
+  ASKING_DATE
+  ASKING_TIME
+  CONFIRMING
+  COMPLETED
+}
+
+enum ConversationRole {
+  USER
+  BOT
+}
+
+model ConversationSession {
+  id                   String            @id @default(cuid())
+  phoneNumber           String            @unique
+  clientName            String?
+  serviceIntent         String?
+  appointmentType       AppointmentType?
+  state                 ConversationState @default(INTRO)
+  context               Json?
+  scheduledAppointmentId String?
+  createdAt             DateTime          @default(now())
+  updatedAt             DateTime          @updatedAt
+
+  messages              ConversationMessage[]
+
+  @@map("conversation_sessions")
+}
+
+model ConversationMessage {
+  id             String            @id @default(cuid())
+  conversationId  String
+  role           ConversationRole
+  content        String
+  createdAt      DateTime          @default(now())
+
+  conversation   ConversationSession @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+
+  @@map("conversation_messages")
 }
