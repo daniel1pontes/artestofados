@@ -22,9 +22,7 @@ RUN mkdir -p assets/images && \
       cp ../frontend/public/images/logo.png assets/images/logo.png; \
     fi || true
 
-# Gerar Prisma Clientnpx 
-RUN npx prisma migrate dev --name make_client_phone_optional
-
+# Gerar Prisma Clientn
 RUN npx prisma generate
 
 # Compilar TypeScript
