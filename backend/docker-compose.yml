@@ -20,8 +20,6 @@ services:
       - ./uploads:/app/uploads
       - ./whatsapp-sessions:/app/whatsapp-sessions
       - ../frontend/public/images/logo.png:/app/assets/images/logo.png:ro
-    networks:
-      - estofados-network
     restart: unless-stopped
 
 
