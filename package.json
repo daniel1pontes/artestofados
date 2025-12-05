@@ -16,7 +16,15 @@
     "postinstall:frontend": "cd frontend && npm install",
     "test": "cd backend && npm test",
     "test:watch": "cd backend && npm run test:watch",
-    "test:coverage": "cd backend && npm run test:coverage"
+    "test:coverage": "cd backend && npm run test:coverage",
+    "docker:build": "docker-compose -f docker-compose.prod.yml build",
+    "docker:up": "docker-compose -f docker-compose.prod.yml up -d",
+    "docker:down": "docker-compose -f docker-compose.prod.yml down",
+    "docker:logs": "docker-compose -f docker-compose.prod.yml logs -f",
+    "deploy:build": "npm run build && npm run docker:build",
+    "deploy:start": "npm run docker:up",
+    "deploy:stop": "npm run docker:down",
+    "deploy:full": "npm run deploy:build && npm run deploy:start"
   },
   "keywords": [
     "estofados",

@@ -1,0 +1,22 @@
+version: '3.8'
+
+services:
+  frontend:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: estofados-frontend
+    ports:
+      - "${FRONTEND_PORT:-3000}:80"
+    networks:
+      - estofados-network
+    restart: unless-stopped
+    # O backend deve estar na mesma rede Docker com o nome 'backend'
+    # Para usar com o docker-compose principal, execute:
+    # docker network create estofados-network (se não existir)
+    # ou use: docker-compose --project-name estofados up
+
+networks:
+  estofados-network:
+    driver: bridge
+
