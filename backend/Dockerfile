@@ -95,10 +95,12 @@ CMD sh -c '\
     fi; \
   done && \
   echo "🔄 Running database migrations..." && \
+  MIGRATION_SUCCESS=false && \
   for i in 1 2 3 4 5; do \
     echo "Migration attempt $i/5..." && \
     if env DATABASE_URL="$DATABASE_URL" npx prisma migrate deploy --schema=./prisma/schema.prisma; then \
       echo "✅ Migrations completed successfully!" && \
+      MIGRATION_SUCCESS=true && \
       break; \
     else \
       if [ $i -eq 5 ]; then \
@@ -109,6 +111,14 @@ CMD sh -c '\
       fi; \
     fi; \
   done && \
+  if [ "$MIGRATION_SUCCESS" = "true" ]; then \
+    echo "🌱 Running database seed..." && \
+    if env DATABASE_URL="$DATABASE_URL" node dist/seed.js; then \
+      echo "✅ Seed completed successfully!"; \
+    else \
+      echo "⚠️ Seed failed, but continuing to start server..."; \
+    fi; \
+  fi && \
   echo "🚀 Starting server..." && \
   exec node dist/server.js'
 
