@@ -149,10 +149,14 @@ router.get("/", authenticateToken, async (req, res, next) => {
 
     // Determinar ordenação baseada no filtro de atraso
     // Se o filtro de atraso estiver ativo, ordenar por deliveryDeadline (mais atrasadas primeiro)
+    // Se o filtro "sem atraso" estiver ativo, ordenar por deliveryDeadline crescente (mais próximas primeiro)
     // Caso contrário, ordenar por createdAt (mais recentes primeiro)
     let orderBy: any = { createdAt: "desc" };
     
-    if (delayFilter && delayFilter !== "all" && delayFilter !== "no-delay") {
+    if (delayFilter === "no-delay") {
+      // Para "sem atraso", ordenar por deliveryDeadline crescente (mais próximas do prazo primeiro)
+      orderBy = { deliveryDeadline: "asc" };
+    } else if (delayFilter && delayFilter !== "all") {
       // Para filtros de atraso, ordenar por deliveryDeadline crescente (datas menores = mais atrasadas)
       orderBy = { deliveryDeadline: "asc" };
     }
