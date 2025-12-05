@@ -24,7 +24,4 @@ services:
       - estofados-network
     restart: unless-stopped
 
-networks:
-  estofados-network:
-    external: true
 

@@ -16,7 +16,3 @@ services:
     # docker network create estofados-network (se não existir)
     # ou use: docker-compose --project-name estofados up
 
-networks:
-  estofados-network:
-    external: true
-

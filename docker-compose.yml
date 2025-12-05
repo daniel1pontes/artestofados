@@ -24,7 +24,4 @@ services:
 volumes:
   postgres_data:
 
-networks:
-  estofados-network:
-    external: true
 
