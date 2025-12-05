@@ -90,26 +90,40 @@ router.get("/", authenticateToken, async (req, res, next) => {
           };
           break;
         case "delayed":
-          // Atrasadas: deliveryDeadline < hoje e não null
+          // Atrasadas: deliveryDeadline < hoje e não null, e não entregues
           delayConditions = {
-            deliveryDeadline: {
-              lt: today,
-              not: null,
-            },
+            AND: [
+              {
+                deliveryDeadline: {
+                  lt: today,
+                  not: null,
+                },
+              },
+              {
+                status: { not: "COMPLETED" },
+              },
+            ],
           };
           break;
         case "7":
         case "30":
         case "60":
-          // Atrasadas mais de X dias
+          // Atrasadas mais de X dias, e não entregues
           const days = parseInt(delayFilter as string);
           const cutoffDate = new Date(today);
           cutoffDate.setDate(cutoffDate.getDate() - days);
           delayConditions = {
-            deliveryDeadline: {
-              lt: cutoffDate,
-              not: null,
-            },
+            AND: [
+              {
+                deliveryDeadline: {
+                  lt: cutoffDate,
+                  not: null,
+                },
+              },
+              {
+                status: { not: "COMPLETED" },
+              },
+            ],
           };
           break;
         default:
