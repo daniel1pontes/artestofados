@@ -87,7 +87,7 @@ model Appointment {
 model OrderService {
   id           String    @id @default(cuid())
   clientName   String
-  clientPhone  String
+  clientPhone  String?
   clientEmail     String?
   clientAddress   String?
   deliveryDeadline DateTime?

@@ -217,7 +217,7 @@ router.post(
       // Validation
       const missingFields = [];
       if (!clientName) missingFields.push("clientName");
-      if (!clientPhone) missingFields.push("clientPhone");
+      // clientPhone e clientAddress são opcionais
       if (!deliveryDeadline) missingFields.push("deliveryDeadline");
       if (!paymentMethod) missingFields.push("paymentMethod");
       if (!items) missingFields.push("items");
