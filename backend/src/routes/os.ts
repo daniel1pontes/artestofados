@@ -359,7 +359,7 @@ router.post(
           const pdfPath = await generateOrderServicePDF({
             id: updatedOS.id,
             clientName: updatedOS.clientName,
-            clientPhone: updatedOS.clientPhone,
+            clientPhone: updatedOS.clientPhone || undefined,
             clientAddress: updatedOS.clientAddress || undefined,
             deliveryDeadline: updatedOS.deliveryDeadline
               ? updatedOS.deliveryDeadline.toISOString().split("T")[0]
@@ -511,7 +511,7 @@ router.put("/:id", authenticateToken, async (req, res, next) => {
         pdfPath = await generateOrderServicePDF({
           id,
           clientName: clientName || existingOS.clientName,
-          clientPhone: clientPhone || existingOS.clientPhone,
+          clientPhone: clientPhone || existingOS.clientPhone || undefined,
           clientAddress: clientAddress || existingOS.clientAddress || undefined,
           deliveryDeadline:
             deliveryDeadline || (existingOS as any).deliveryDeadline
@@ -714,7 +714,7 @@ router.get("/:id/pdf", async (req, res, next) => {
           const newPdfPath = await generateOrderServicePDF({
             id: os.id,
             clientName: os.clientName,
-            clientPhone: os.clientPhone,
+            clientPhone: os.clientPhone || undefined,
             clientAddress: os.clientAddress || undefined,
             deliveryDeadline: (os as any).deliveryDeadline
               ? new Date((os as any).deliveryDeadline)

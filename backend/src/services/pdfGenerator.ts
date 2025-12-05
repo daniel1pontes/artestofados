@@ -6,7 +6,7 @@ import sizeOf from "image-size";
 export interface OrderServiceData {
   id: string;
   clientName: string;
-  clientPhone: string;
+  clientPhone?: string;
   clientAddress?: string;
   deliveryDeadline?: string;
   paymentMethod?: string;
