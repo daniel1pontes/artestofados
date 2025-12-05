@@ -9,7 +9,7 @@ const envSchema = z.object({
   NODE_ENV: z
     .enum(["development", "production", "test"])
     .default("development"),
-  PORT: z.string().default("3001"),
+  PORT: z.string().default("4041"),
   DATABASE_URL: z.string().min(1, "DATABASE_URL is required"),
   JWT_SECRET: z
     .string()
@@ -18,7 +18,7 @@ const envSchema = z.object({
   WHATSAPP_SESSION_PATH: z.string().default("./whatsapp-sessions"),
   OPENAI_API_KEY: z.string().optional(),
   GOOGLE_API_CREDENTIALS: z.string().optional(),
-  FRONTEND_URL: z.string().default("http://localhost:4040"),
+  FRONTEND_URL: z.string().default("http://72.61.218.112:4040"),
   // Adicione outras variáveis de ambiente conforme necessário
 });
 
@@ -38,7 +38,7 @@ export function validateConfig() {
     // Retorna as variáveis de ambiente validadas
     return {
       nodeEnv: envVars.NODE_ENV,
-      port: parseInt(envVars.PORT, 10) || 3001,
+      port: parseInt(envVars.PORT, 10) || 4041,
       database: {
         url: envVars.DATABASE_URL,
       },

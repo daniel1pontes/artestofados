@@ -7,7 +7,7 @@ dotenv.config();
 // Validar configurações
 validateConfig();
 
-const PORT = process.env.PORT || 3001;
+const PORT = process.env.PORT || 4041;
 
 // Graceful shutdown
 const shutdown = async () => {

@@ -54,11 +54,11 @@ RUN mkdir -p uploads/pdfs whatsapp-sessions assets/images
 
 # Variáveis de ambiente padrão
 ENV NODE_ENV=production
-ENV PORT=3001
+ENV PORT=4041
 # DATABASE_URL será definida pelo docker-compose.yml
 
 # Expor porta
-EXPOSE 3001
+EXPOSE 4041
 
 # Comando para iniciar o servidor com migrations
 CMD sh -c '\

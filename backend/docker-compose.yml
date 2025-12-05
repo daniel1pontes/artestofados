@@ -6,16 +6,16 @@ services:
     container_name: artestofados-backend
     environment:
       NODE_ENV: ${NODE_ENV:-production}
-      PORT: ${PORT:-3001}
+      PORT: ${PORT:-4041}
       DATABASE_URL: ${DATABASE_URL:-postgres://postgres:32b6a1e6de61c174c990@sistema_artestofados_banco_de_dados:5432/sistema_artestofados?sslmode=disable}
       JWT_SECRET: ${JWT_SECRET:-default-jwt-secret-key-must-be-at-least-32-characters-long-for-security}
       JWT_EXPIRES_IN: ${JWT_EXPIRES_IN:-7d}
       WHATSAPP_SESSION_PATH: ${WHATSAPP_SESSION_PATH:-./whatsapp-sessions}
       OPENAI_API_KEY: ${OPENAI_API_KEY:-}
       GOOGLE_API_CREDENTIALS: ${GOOGLE_API_CREDENTIALS:-}
-      FRONTEND_URL: ${FRONTEND_URL:-http://localhost:4040}
+      FRONTEND_URL: ${FRONTEND_URL:-http://72.61.218.112:4040}
     ports:
-      - "${PORT:-3001}:3001"
+      - "${PORT:-4041}:4041"
     volumes:
       - ./uploads:/app/uploads
       - ./whatsapp-sessions:/app/whatsapp-sessions
