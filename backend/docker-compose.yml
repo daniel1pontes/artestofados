@@ -13,7 +13,7 @@ services:
     volumes:
       - postgres_data:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U estofados_db"]
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-artestofados}"]
       interval: 10s
       timeout: 5s
       retries: 5
