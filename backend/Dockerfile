@@ -33,8 +33,8 @@ FROM node:20-alpine AS production
 
 WORKDIR /app
 
-# Instalar dependências necessárias para Prisma
-RUN apk add --no-cache openssl
+# Instalar dependências necessárias para Prisma e verificação de banco
+RUN apk add --no-cache openssl postgresql-client
 
 # Instalar apenas dependências de produção
 COPY package*.json ./
@@ -72,11 +72,31 @@ CMD sh -c '\
   fi && \
   rm -f /app/.env /app/.env.local /app/.env.*.local 2>/dev/null || true && \
   rm -rf /app/node_modules/.prisma/.cache 2>/dev/null || true && \
-  echo "Waiting for database connection..." && \
-  sleep 5 && \
+  echo "⏳ Waiting for database to be ready..." && \
+  MAX_ATTEMPTS=30 && \
+  ATTEMPT=0 && \
+  DB_HOST=$(echo "$DATABASE_URL" | sed -E "s/.*@([^:]+).*/\1/") && \
+  DB_PORT=$(echo "$DATABASE_URL" | sed -E "s/.*:([0-9]+)\/.*/\1/" | head -1) && \
+  DB_USER=$(echo "$DATABASE_URL" | sed -E "s/.*:\/\/([^:]+):.*/\1/") && \
+  DB_PORT=${DB_PORT:-5432} && \
+  echo "Checking connection to: $DB_USER@$DB_HOST:$DB_PORT" && \
+  while [ $ATTEMPT -lt $MAX_ATTEMPTS ]; do \
+    ATTEMPT=$((ATTEMPT + 1)) && \
+    if pg_isready -h "$DB_HOST" -p "$DB_PORT" -U "$DB_USER" > /dev/null 2>&1; then \
+      echo "✅ Database is ready!" && \
+      break; \
+    else \
+      if [ $ATTEMPT -eq $MAX_ATTEMPTS ]; then \
+        echo "❌ Database not available after $MAX_ATTEMPTS attempts" && \
+        exit 1; \
+      fi && \
+      echo "⏳ Waiting for database... (attempt $ATTEMPT/$MAX_ATTEMPTS)" && \
+      sleep 2; \
+    fi; \
+  done && \
+  echo "🔄 Running database migrations..." && \
   for i in 1 2 3 4 5; do \
     echo "Migration attempt $i/5..." && \
-    echo "Using DATABASE_URL: $DATABASE_URL" && \
     if env DATABASE_URL="$DATABASE_URL" npx prisma migrate deploy --schema=./prisma/schema.prisma; then \
       echo "✅ Migrations completed successfully!" && \
       break; \

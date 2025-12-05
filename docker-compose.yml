@@ -1,0 +1,30 @@
+services:
+  postgres:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: estofados-postgres
+    environment:
+      POSTGRES_USER: artestofados
+      POSTGRES_PASSWORD: artestofados25
+      POSTGRES_DB: estofados_db
+    ports:
+      - "${POSTGRES_PORT:-5432}:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-artestofados}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - estofados-network
+    restart: unless-stopped
+
+volumes:
+  postgres_data:
+
+networks:
+  estofados-network:
+    external: true
+

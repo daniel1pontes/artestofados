@@ -18,5 +18,5 @@ services:
 
 networks:
   estofados-network:
-    driver: bridge
+    external: true
 
