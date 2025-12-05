@@ -319,16 +319,20 @@ router.post(
         },
       });
 
-      // Calculate total
-      const calculatedTotal = itemsArray.reduce(
+      // Calculate subtotal (soma dos totais dos itens)
+      const subtotal = itemsArray.reduce(
         (sum: number, item: any) => sum + parseFloat(item.total),
         0
       );
 
+      // Apply general discount (percentage) to calculate final total
+      const discountPercent = discount ? parseFloat(discount) : 0;
+      const calculatedTotal = subtotal * (1 - discountPercent / 100);
+
       // Update with total
       const updatedOS = await prisma.orderService.update({
         where: { id: orderService.id },
-        data: { total: calculatedTotal },
+        data: { total: Math.max(0, calculatedTotal) },
         include: {
           items: true,
         },
@@ -448,10 +452,21 @@ router.put("/:id", authenticateToken, async (req, res, next) => {
     if (items) {
       const itemsArray = Array.isArray(items) ? items : JSON.parse(items);
 
-      processedItems = itemsArray.map((item: OrderItem) => ({
-        ...item,
-        total: item.quantity * item.unitValue,
-      }));
+      processedItems = itemsArray.map((item: OrderItem) => {
+        // Calculate item total considering item discount if present
+        const qty = parseFloat(item.quantity.toString());
+        const unitVal = parseFloat(item.unitValue.toString());
+        const itemDiscount = parseFloat((item as any).discount || 0);
+        const itemSubtotal = qty * unitVal;
+        const itemTotal = itemDiscount > 0 
+          ? itemSubtotal * (1 - itemDiscount / 100)
+          : itemSubtotal;
+        
+        return {
+          ...item,
+          total: itemTotal,
+        };
+      });
 
       await prisma.orderItem.deleteMany({
         where: { osId: id },
@@ -472,7 +487,10 @@ router.put("/:id", authenticateToken, async (req, res, next) => {
       (sum: number, item: OrderItem) => sum + item.total,
       0
     );
-    const total = Math.max(0, subtotal - (discount !== undefined ? discount : existingOS.discount || 0));
+    
+    // Apply general discount (percentage) to calculate final total
+    const discountPercent = discount !== undefined ? parseFloat(discount) : (existingOS.discount || 0);
+    const total = Math.max(0, subtotal * (1 - discountPercent / 100));
 
     let pdfPath = existingOS.pdfPath;
 
@@ -539,17 +557,17 @@ router.put("/:id", authenticateToken, async (req, res, next) => {
     const updatedOS = await prisma.orderService.update({
       where: { id },
       data: {
-        clientName,
-        clientPhone,
-        clientAddress,
+        clientName: clientName || existingOS.clientName,
+        clientPhone: clientPhone || existingOS.clientPhone,
+        clientAddress: clientAddress !== undefined ? clientAddress : existingOS.clientAddress,
         deliveryDeadline: deliveryDeadline
           ? new Date(deliveryDeadline)
           : (existingOS as any).deliveryDeadline,
-        paymentMethod,
-        discount,
+        paymentMethod: paymentMethod || existingOS.paymentMethod,
+        discount: discount !== undefined ? parseFloat(discount) : existingOS.discount,
         total,
-        status,
-        pdfPath,
+        status: status || existingOS.status,
+        pdfPath: pdfPath || existingOS.pdfPath,
         lastEditedBy: userId,
       } as any,
       include: {

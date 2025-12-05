@@ -115,12 +115,6 @@ export default function Login() {
               )}
             </button>
           </div>
-
-          <div className="text-center text-xs text-gray-500">
-            <p>Credenciais de teste:</p>
-            <p>Admin: admin@estofados.com / admin123</p>
-            <p>Atendente: atendente@estofados.com / atendente123</p>
-          </div>
         </form>
       </div>
     </div>

@@ -653,7 +653,9 @@ class PDFService {
     let posY = 100;
     const pageWidth = 495; // Largura útil da página (A4 com margens)
     const maxImageWidth = pageWidth - 100; // Largura máxima com margens laterais
-    const maxImageHeight = 400; // Altura máxima por imagem
+    const pageHeight = 792; // Altura total da página A4
+    const bottomMargin = 50; // Margem inferior
+    const availableHeight = pageHeight - bottomMargin; // Altura disponível na página
     const marginBetweenImages = 20; // Espaço entre imagens
 
     for (const imageData of imagens) {
@@ -665,12 +667,6 @@ class PDFService {
           imageData.buffer.length
         );
 
-        // Verificar se precisa de nova página
-        if (posY > 650) {
-          doc.addPage();
-          posY = 100;
-        }
-
         // Obter dimensões reais da imagem
         let imageWidth: number;
         let imageHeight: number;
@@ -678,12 +674,12 @@ class PDFService {
         try {
           const dimensions = sizeOf(imageData.buffer);
           imageWidth = dimensions.width || maxImageWidth;
-          imageHeight = dimensions.height || maxImageHeight;
+          imageHeight = dimensions.height || availableHeight;
         } catch (sizeError) {
           // Se não conseguir obter dimensões, usar valores padrão
           console.warn("⚠️ Não foi possível obter dimensões da imagem, usando padrão");
           imageWidth = maxImageWidth;
-          imageHeight = maxImageHeight;
+          imageHeight = availableHeight;
         }
 
         // Calcular dimensões mantendo proporção
@@ -691,16 +687,34 @@ class PDFService {
         let finalHeight = imageHeight;
         const aspectRatio = imageWidth / imageHeight;
 
-        // Ajustar para caber na largura máxima
+        // Ajustar para caber na largura máxima (mantendo proporção)
         if (finalWidth > maxImageWidth) {
           finalWidth = maxImageWidth;
           finalHeight = finalWidth / aspectRatio;
         }
 
-        // Ajustar para caber na altura máxima
-        if (finalHeight > maxImageHeight) {
-          finalHeight = maxImageHeight;
-          finalWidth = finalHeight * aspectRatio;
+        // Calcular altura disponível na página atual
+        const availableHeightOnPage = availableHeight - posY;
+
+        // Se a imagem não cabe na página atual, criar nova página
+        if (finalHeight > availableHeightOnPage) {
+          doc.addPage();
+          posY = 50; // Começar no topo da nova página
+          
+          // Recalcular altura disponível na nova página
+          const newAvailableHeight = availableHeight - posY;
+          
+          // Se ainda não couber, ajustar para usar toda a altura disponível
+          if (finalHeight > newAvailableHeight) {
+            finalHeight = newAvailableHeight;
+            finalWidth = finalHeight * aspectRatio;
+            
+            // Se a largura ficou maior que o máximo, ajustar novamente
+            if (finalWidth > maxImageWidth) {
+              finalWidth = maxImageWidth;
+              finalHeight = finalWidth / aspectRatio;
+            }
+          }
         }
 
         // Centralizar horizontalmente
@@ -712,6 +726,7 @@ class PDFService {
           aspectRatio,
           startX,
           posY,
+          availableHeightOnPage: availableHeight - posY,
         });
 
         // Incorpora a imagem diretamente no PDF usando o buffer
