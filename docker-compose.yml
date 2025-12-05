@@ -3,7 +3,7 @@ services:
     build:
       context: .
       dockerfile: Dockerfile
-    container_name: estofados-postgres
+    container_name: artestofados-postgres
     environment:
       POSTGRES_USER: artestofados
       POSTGRES_PASSWORD: artestofados25
