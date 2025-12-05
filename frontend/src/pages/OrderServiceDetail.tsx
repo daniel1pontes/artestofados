@@ -244,9 +244,9 @@ export default function OrderServiceDetail() {
                 }
               }}
               disabled={markAsDeliveredMutation.isPending}
-              className="flex items-center space-x-2 bg-green-600 text-white py-2 px-4 rounded-md hover:bg-green-700 disabled:opacity-50"
+              className="flex items-center space-x-1.5 bg-green-600 text-white py-1.5 px-3 rounded-md hover:bg-green-700 disabled:opacity-50 text-sm"
             >
-              <CheckCircle className="h-4 w-4" />
+              <CheckCircle className="h-3.5 w-3.5" />
               <span>
                 {markAsDeliveredMutation.isPending
                   ? "Marcando..."
