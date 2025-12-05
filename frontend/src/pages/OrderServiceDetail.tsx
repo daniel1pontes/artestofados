@@ -396,7 +396,7 @@ export default function OrderServiceDetail() {
               <div className="flex justify-between text-sm">
                 <span className="text-gray-600">Desconto:</span>
                 <span className="font-medium text-red-600">
-                  - R$ {os.discount.toFixed(2)}
+                  - % {os.discount.toFixed(2)}
                 </span>
               </div>
               <div className="border-t pt-3">

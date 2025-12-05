@@ -471,7 +471,7 @@ export default function OrderService() {
                   Desconto ({formData.discount}%):
                 </span>
                 <span className="font-medium text-red-600">
-                  - R$ {((subtotal * formData.discount) / 100).toFixed(2)}
+                  - % {((subtotal * formData.discount) / 100).toFixed(2)}
                 </span>
               </div>
               <div className="flex justify-between items-center text-lg font-bold">
