@@ -77,7 +77,7 @@ CMD sh -c '\
   ATTEMPT=0 && \
   DB_HOST=$(echo "$DATABASE_URL" | sed -E "s/.*@([^:]+).*/\1/") && \
   DB_PORT=$(echo "$DATABASE_URL" | sed -E "s/.*:([0-9]+)\/.*/\1/" | head -1) && \
-  DB_USER=$(echo "$DATABASE_URL" | sed -E "s/.*:\/\/([^:]+):.*/\1/") && \
+  DB_USER=$(echo "$DATABASE_URL" | sed -E "s|.*://([^:@]+)(:.*)?@.*|\1|") && \
   DB_PORT=${DB_PORT:-5432} && \
   echo "Checking connection to: $DB_USER@$DB_HOST:$DB_PORT" && \
   while [ $ATTEMPT -lt $MAX_ATTEMPTS ]; do \
