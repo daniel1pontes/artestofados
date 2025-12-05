@@ -49,14 +49,33 @@ export default function Dashboard() {
                 }).length
             ),
           api.get("/appointments").then((res) => res.data.length),
-          api.get("/os").then((res) => res.data.os?.length || 0),
+          api
+            .get("/os/stats/count")
+            .then((res) => {
+              // A resposta deve ser { total: number }
+              const total = res.data?.total;
+              console.log("📊 Total de OS da API:", total);
+              return typeof total === 'number' ? total : 0;
+            })
+            .catch((error) => {
+              console.error("❌ Erro ao buscar total de OS:", error);
+              // Fallback: tentar buscar pela rota normal
+              return api
+                .get("/os", { params: { page: 1, limit: 1 } })
+                .then((res) => res.data?.pagination?.total ?? res.data?.data?.length ?? 0)
+                .catch(() => 0);
+            }),
         ]);
 
-      return {
+      const result = {
         appointmentsToday,
         appointmentsThisWeek,
-        totalOS,
+        totalOS: Number(totalOS) || 0,
       };
+      
+      console.log("📊 Valores calculados:", result);
+
+      return result;
     },
   });
 
@@ -100,7 +119,7 @@ export default function Dashboard() {
     },
     {
       title: "Total de OS",
-      value: stats?.totalOS || 0,
+      value: Number(stats?.totalOS) || 0,
       icon: FileText,
       color: "bg-purple-500",
     },

@@ -2,7 +2,7 @@ import { useQuery, useMutation } from "@tanstack/react-query";
 import { Link, useParams, useNavigate } from "react-router-dom";
 import { api } from "../services/api";
 import toast from "react-hot-toast";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import {
   ArrowLeft,
   Download,
@@ -52,6 +52,8 @@ export default function OrderServiceDetail() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const [showPdfModal, setShowPdfModal] = useState(false);
+  const [pdfBlobUrl, setPdfBlobUrl] = useState<string | null>(null);
+  const [lastPdfPath, setLastPdfPath] = useState<string | null>(null);
 
   const { data: os, isLoading } = useQuery<OrderService>({
     queryKey: ["os", id],
@@ -96,6 +98,81 @@ export default function OrderServiceDetail() {
     } catch (error) {
       toast.error("Erro ao baixar PDF");
     }
+  };
+
+  const handleOpenPdfModal = async () => {
+    if (!os?.pdfPath) {
+      toast.error("PDF não disponível");
+      return;
+    }
+
+    try {
+      const response = await api.get(`/os/${id}/pdf`, {
+        responseType: "blob",
+      });
+
+      const blob = new Blob([response.data], { type: "application/pdf" });
+      const url = window.URL.createObjectURL(blob);
+      setPdfBlobUrl(url);
+      setLastPdfPath(os.pdfPath || null);
+      setShowPdfModal(true);
+    } catch (error: any) {
+      console.error("Erro ao carregar PDF:", error);
+      toast.error(error.response?.data?.error || "Erro ao carregar PDF");
+    }
+  };
+
+  useEffect(() => {
+    return () => {
+      if (pdfBlobUrl) {
+        window.URL.revokeObjectURL(pdfBlobUrl);
+      }
+    };
+  }, [pdfBlobUrl]);
+
+  // Recarregar PDF quando a OS for atualizada e o modal estiver aberto
+  useEffect(() => {
+    if (showPdfModal && os?.pdfPath && id) {
+      // Só recarregar se o pdfPath mudou (PDF foi regenerado)
+      if (lastPdfPath && lastPdfPath !== os.pdfPath) {
+        const reloadPdf = async () => {
+          try {
+            // Limpar blob URL antigo
+            if (pdfBlobUrl) {
+              window.URL.revokeObjectURL(pdfBlobUrl);
+            }
+
+            // Buscar novo PDF
+            const response = await api.get(`/os/${id}/pdf`, {
+              responseType: "blob",
+            });
+
+            const blob = new Blob([response.data], { type: "application/pdf" });
+            const url = window.URL.createObjectURL(blob);
+            setPdfBlobUrl(url);
+            setLastPdfPath(os.pdfPath || null);
+          } catch (error: any) {
+            console.error("Erro ao recarregar PDF:", error);
+            toast.error(error.response?.data?.error || "Erro ao recarregar PDF");
+          }
+        };
+
+        reloadPdf();
+      } else if (!lastPdfPath) {
+        // Primeira vez que abre o modal, apenas salvar o pdfPath
+        setLastPdfPath(os.pdfPath || null);
+      }
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [os?.pdfPath, showPdfModal, id, lastPdfPath]);
+
+  const handleClosePdfModal = () => {
+    setShowPdfModal(false);
+    if (pdfBlobUrl) {
+      window.URL.revokeObjectURL(pdfBlobUrl);
+      setPdfBlobUrl(null);
+    }
+    setLastPdfPath(null);
   };
 
   if (isLoading) {
@@ -143,15 +220,6 @@ export default function OrderServiceDetail() {
         </div>
 
         <div className="flex items-center space-x-3">
-          {os.pdfPath && (
-            <button
-              onClick={handleDownloadPDF}
-              className="flex items-center space-x-2 bg-green-600 text-white py-2 px-4 rounded-md hover:bg-green-700"
-            >
-              <Download className="h-4 w-4" />
-              <span>Baixar PDF</span>
-            </button>
-          )}
           <Link
             to={`/os/${os.id}/edit`}
             className="flex items-center space-x-2 bg-blue-600 text-white py-2 px-4 rounded-md hover:bg-blue-700"
@@ -295,21 +363,20 @@ export default function OrderServiceDetail() {
 
             <div className="space-y-3">
               <button
-                onClick={() => setShowPdfModal(true)}
+                onClick={handleOpenPdfModal}
                 className="w-full flex items-center justify-center space-x-2 bg-blue-600 text-white py-2 px-4 rounded-md hover:bg-blue-700 transition-colors"
               >
                 <Eye className="h-4 w-4" />
                 <span>Visualizar PDF</span>
               </button>
 
-              <a
-                href={`/api/os/${os.id}/pdf?t=${Date.now()}`}
-                download={`os-${os.id}.pdf`}
+              <button
+                onClick={handleDownloadPDF}
                 className="w-full flex items-center justify-center space-x-2 bg-green-600 text-white py-2 px-4 rounded-md hover:bg-green-700 transition-colors"
               >
                 <Download className="h-4 w-4" />
                 <span>Baixar PDF</span>
-              </a>
+              </button>
             </div>
           </div>
 
@@ -384,7 +451,7 @@ export default function OrderServiceDetail() {
             {/* Background overlay */}
             <div
               className="fixed inset-0 bg-gray-500 bg-opacity-75 transition-opacity"
-              onClick={() => setShowPdfModal(false)}
+              onClick={handleClosePdfModal}
             ></div>
 
             {/* Modal panel */}
@@ -395,7 +462,7 @@ export default function OrderServiceDetail() {
                   Visualizar PDF - OS #{os.id.slice(-8)}
                 </h3>
                 <button
-                  onClick={() => setShowPdfModal(false)}
+                  onClick={handleClosePdfModal}
                   className="text-gray-400 hover:text-gray-500 transition-colors"
                 >
                   <X className="h-6 w-6" />
@@ -407,11 +474,17 @@ export default function OrderServiceDetail() {
                 className="p-4 overflow-auto"
                 style={{ height: "calc(90vh - 80px)" }}
               >
-                <iframe
-                  src={`/api/os/${os.id}/pdf?t=${Date.now()}`}
-                  className="w-full h-full border-0"
-                  title="PDF Viewer"
-                />
+                {pdfBlobUrl ? (
+                  <iframe
+                    src={pdfBlobUrl}
+                    className="w-full h-full border-0"
+                    title="PDF Viewer"
+                  />
+                ) : (
+                  <div className="flex items-center justify-center h-full">
+                    <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
+                  </div>
+                )}
               </div>
             </div>
           </div>

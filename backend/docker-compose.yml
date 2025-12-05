@@ -28,8 +28,8 @@ services:
     environment:
       NODE_ENV: ${NODE_ENV:-production}
       PORT: ${PORT:-3001}
-      DATABASE_URL: ${DATABASE_URL:-postgresql://artestofados:artestofados25@localhost:5432/estofados_db}
-      JWT_SECRET: ${JWT_SECRET}
+      DATABASE_URL: ${DATABASE_URL:-postgresql://artestofados:artestofados25@postgres:5432/estofados_db}
+      JWT_SECRET: ${JWT_SECRET:-default-jwt-secret-key-must-be-at-least-32-characters-long-for-security}
       JWT_EXPIRES_IN: ${JWT_EXPIRES_IN:-7d}
       WHATSAPP_SESSION_PATH: ${WHATSAPP_SESSION_PATH:-./whatsapp-sessions}
       OPENAI_API_KEY: ${OPENAI_API_KEY:-}
@@ -40,6 +40,7 @@ services:
     volumes:
       - ./uploads:/app/uploads
       - ./whatsapp-sessions:/app/whatsapp-sessions
+      - ../frontend/public/images/logo.png:/app/assets/images/logo.png:ro
     depends_on:
       postgres:
         condition: service_healthy

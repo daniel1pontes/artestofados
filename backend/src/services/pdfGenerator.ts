@@ -33,16 +33,20 @@ class PDFService {
   private logoPath: string;
 
   constructor() {
-    // Configuração de diretórios (ajustada para o ambiente simulado, mantendo a estrutura original)
+    // Configuração de diretórios
     this.uploadsDir = path.join(process.cwd(), "uploads");
-    this.assetsDir = path.join(
-      process.cwd(),
-      "..",
-      "frontend",
-      "public",
-      "images"
-    );
-    this.logoPath = path.join(this.assetsDir, "logo.png");
+    
+    // Tentar múltiplos caminhos possíveis para a logo
+    const possibleLogoPaths = [
+      path.join(process.cwd(), "assets", "images", "logo.png"), // Docker/produção
+      path.join(process.cwd(), "..", "frontend", "public", "images", "logo.png"), // Desenvolvimento local
+      path.join(process.cwd(), "public", "images", "logo.png"), // Alternativa
+    ];
+    
+    // Encontrar o primeiro caminho que existe
+    this.logoPath = possibleLogoPaths.find(p => fs.existsSync(p)) || possibleLogoPaths[0];
+    
+    this.assetsDir = path.dirname(this.logoPath);
     this.ensureDirectories();
   }
 
@@ -95,11 +99,15 @@ class PDFService {
   private adicionarCabecalho(doc: PDFKit.PDFDocument) {
     // Tentar adicionar logo, mas não quebrar se não existir
     try {
+      console.log("🔍 Procurando logo em:", this.logoPath);
+      console.log("🔍 Logo existe?", fs.existsSync(this.logoPath));
+      
       if (fs.existsSync(this.logoPath)) {
         doc.image(this.logoPath, 50, 40, { width: 100 });
-        console.log("✅ Logo carregada");
+        console.log("✅ Logo carregada com sucesso de:", this.logoPath);
       } else {
-        console.warn("⚠️ Logo não encontrada, continuando sem logo");
+        console.warn("⚠️ Logo não encontrada em:", this.logoPath);
+        console.warn("⚠️ Continuando sem logo");
       }
     } catch (error) {
       console.warn("⚠️ Erro ao carregar logo, continuando sem logo:", error);
@@ -643,6 +651,11 @@ class PDFService {
     doc.moveDown(2);
 
     let posY = 100;
+    const pageWidth = 495; // Largura útil da página (A4 com margens)
+    const maxImageWidth = pageWidth - 100; // Largura máxima com margens laterais
+    const maxImageHeight = 400; // Altura máxima por imagem
+    const marginBetweenImages = 20; // Espaço entre imagens
+
     for (const imageData of imagens) {
       try {
         console.log(
@@ -652,34 +665,63 @@ class PDFService {
           imageData.buffer.length
         );
 
+        // Verificar se precisa de nova página
         if (posY > 650) {
           doc.addPage();
           posY = 100;
         }
 
-        // Tamanho fixo para teste - sem calcular dimensões por enquanto
-        const maxWidth = 400;
-        const maxHeight = 400;
-        const width = maxWidth;
-        const height = maxHeight;
+        // Obter dimensões reais da imagem
+        let imageWidth: number;
+        let imageHeight: number;
+        
+        try {
+          const dimensions = sizeOf(imageData.buffer);
+          imageWidth = dimensions.width || maxImageWidth;
+          imageHeight = dimensions.height || maxImageHeight;
+        } catch (sizeError) {
+          // Se não conseguir obter dimensões, usar valores padrão
+          console.warn("⚠️ Não foi possível obter dimensões da imagem, usando padrão");
+          imageWidth = maxImageWidth;
+          imageHeight = maxImageHeight;
+        }
 
-        // Centraliza horizontalmente
-        const startX = 50 + (495 - width) / 2;
+        // Calcular dimensões mantendo proporção
+        let finalWidth = imageWidth;
+        let finalHeight = imageHeight;
+        const aspectRatio = imageWidth / imageHeight;
 
-        console.log("📐 Usando dimensões fixas:", {
-          width,
-          height,
+        // Ajustar para caber na largura máxima
+        if (finalWidth > maxImageWidth) {
+          finalWidth = maxImageWidth;
+          finalHeight = finalWidth / aspectRatio;
+        }
+
+        // Ajustar para caber na altura máxima
+        if (finalHeight > maxImageHeight) {
+          finalHeight = maxImageHeight;
+          finalWidth = finalHeight * aspectRatio;
+        }
+
+        // Centralizar horizontalmente
+        const startX = 50 + (pageWidth - finalWidth) / 2;
+
+        console.log("📐 Dimensões calculadas:", {
+          original: { width: imageWidth, height: imageHeight },
+          final: { width: finalWidth, height: finalHeight },
+          aspectRatio,
           startX,
           posY,
         });
 
         // Incorpora a imagem diretamente no PDF usando o buffer
+        // Usar width e height específicos para manter proporção exata
         doc.image(imageData.buffer, startX, posY, {
-          fit: [width, height], // Usa fit em vez de width/height específicos
-          align: "center",
-          valign: "center",
+          width: finalWidth,
+          height: finalHeight,
         });
-        posY += height + 20; // Adiciona a altura da imagem mais uma margem
+
+        posY += finalHeight + marginBetweenImages;
 
         console.log(`✅ Imagem incorporada no PDF: ${imageData.originalname}`);
       } catch (err) {

@@ -18,6 +18,9 @@ RUN npm run build
 # Estágio 2: Produção com Nginx
 FROM nginx:alpine AS production
 
+# Instalar wget para healthcheck
+RUN apk add --no-cache wget
+
 # Copiar arquivos buildados
 COPY --from=builder /app/dist /usr/share/nginx/html
 

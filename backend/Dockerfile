@@ -11,8 +11,16 @@ COPY prisma ./prisma
 # Instalar dependências
 RUN npm ci
 
-# Copiar código fonte
+# Copiar código fonte (excluindo .env)
 COPY . .
+RUN rm -f .env .env.local .env.*.local 2>/dev/null || true
+
+# Copiar logo do frontend se existir (para desenvolvimento local)
+# Em produção, a logo deve ser copiada via volume ou estar no diretório assets
+RUN mkdir -p assets/images && \
+    if [ -f ../frontend/public/images/logo.png ]; then \
+      cp ../frontend/public/images/logo.png assets/images/logo.png; \
+    fi || true
 
 # Gerar Prisma Client
 RUN npx prisma generate
@@ -25,6 +33,9 @@ FROM node:20-alpine AS production
 
 WORKDIR /app
 
+# Instalar dependências necessárias para Prisma
+RUN apk add --no-cache openssl
+
 # Instalar apenas dependências de produção
 COPY package*.json ./
 RUN npm ci --only=production
@@ -33,17 +44,51 @@ RUN npm ci --only=production
 COPY --from=builder /app/dist ./dist
 COPY --from=builder /app/prisma ./prisma
 COPY --from=builder /app/node_modules/.prisma ./node_modules/.prisma
+COPY --from=builder /app/node_modules/@prisma ./node_modules/@prisma
 
-# Criar diretório para uploads
-RUN mkdir -p uploads/pdfs whatsapp-sessions
+# Copiar assets (logo) se existir no builder
+COPY --from=builder /app/assets ./assets
+
+# Criar diretório para uploads e assets
+RUN mkdir -p uploads/pdfs whatsapp-sessions assets/images
 
 # Variáveis de ambiente padrão
 ENV NODE_ENV=production
 ENV PORT=3001
+# DATABASE_URL será definida pelo docker-compose.yml
 
 # Expor porta
 EXPOSE 3001
 
-# Comando para iniciar o servidor
-CMD ["sh", "-c", "npx prisma migrate deploy && node dist/server.js"]
+# Comando para iniciar o servidor com migrations
+CMD sh -c '\
+  echo "🔍 Environment check:" && \
+  echo "DATABASE_URL=$DATABASE_URL" && \
+  echo "NODE_ENV=$NODE_ENV" && \
+  echo "" && \
+  if [ -z "$DATABASE_URL" ]; then \
+    echo "❌ ERROR: DATABASE_URL is not set!" && \
+    exit 1; \
+  fi && \
+  rm -f /app/.env /app/.env.local /app/.env.*.local 2>/dev/null || true && \
+  rm -rf /app/node_modules/.prisma/.cache 2>/dev/null || true && \
+  echo "Waiting for database connection..." && \
+  sleep 5 && \
+  for i in 1 2 3 4 5; do \
+    echo "Migration attempt $i/5..." && \
+    echo "Using DATABASE_URL: $DATABASE_URL" && \
+    if env DATABASE_URL="$DATABASE_URL" npx prisma migrate deploy --schema=./prisma/schema.prisma; then \
+      echo "✅ Migrations completed successfully!" && \
+      break; \
+    else \
+      if [ $i -eq 5 ]; then \
+        echo "⚠️ Migration failed after 5 attempts, starting server anyway..."; \
+      else \
+        echo "Migration attempt $i failed, retrying in 5 seconds..." && \
+        sleep 5; \
+      fi; \
+    fi; \
+  done && \
+  echo "🚀 Starting server..." && \
+  exec node dist/server.js'
 

@@ -124,6 +124,16 @@ router.get("/", authenticateToken, async (req, res, next) => {
   }
 });
 
+// Rota para obter estatísticas (deve vir antes de /:id para não ser capturada)
+router.get("/stats/count", authenticateToken, async (req, res, next) => {
+  try {
+    const total = await prisma.orderService.count();
+    res.json({ total });
+  } catch (error) {
+    next(error);
+  }
+});
+
 router.get("/:id", authenticateToken, async (req, res, next) => {
   try {
     const { id } = req.params;
@@ -453,13 +463,16 @@ router.put("/:id", authenticateToken, async (req, res, next) => {
           osId: id,
         })),
       });
+    } else {
+      // Se items não foi fornecido, usar os itens existentes
+      processedItems = existingOS.items || [];
     }
 
     subtotal = processedItems.reduce(
       (sum: number, item: OrderItem) => sum + item.total,
       0
     );
-    const total = Math.max(0, subtotal - (discount || 0));
+    const total = Math.max(0, subtotal - (discount !== undefined ? discount : existingOS.discount || 0));
 
     let pdfPath = existingOS.pdfPath;
 

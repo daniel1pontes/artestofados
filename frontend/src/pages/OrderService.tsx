@@ -124,12 +124,12 @@ export default function OrderService() {
     mutationFn: (data: OrderServiceData) => {
       return api.put(`/os/${id}`, {
         ...data,
-        regeneratePDF: false,
+        regeneratePDF: true, // Sempre regenerar PDF quando editar para garantir que está atualizado
       });
     },
     onSuccess: () => {
       toast.success("Ordem de Serviço atualizada com sucesso!");
-      navigate("/os");
+      navigate(`/os/${id}`); // Redireciona para a página de detalhes da OS editada
     },
     onError: (error: any) => {
       toast.error(error.response?.data?.error || "Erro ao atualizar OS");
