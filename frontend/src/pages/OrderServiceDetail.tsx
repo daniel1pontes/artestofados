@@ -387,26 +387,46 @@ export default function OrderServiceDetail() {
             </h3>
 
             <div className="space-y-3">
-              <div className="flex justify-between text-sm">
-                <span className="text-gray-600">Subtotal:</span>
-                <span className="font-medium">
-                  R$ {(os.total + os.discount).toFixed(2)}
-                </span>
-              </div>
-              <div className="flex justify-between text-sm">
-                <span className="text-gray-600">Desconto:</span>
-                <span className="font-medium text-red-600">
-                  - % {os.discount.toFixed(2)}
-                </span>
-              </div>
-              <div className="border-t pt-3">
-                <div className="flex justify-between text-lg font-bold">
-                  <span>Total:</span>
-                  <span className="text-blue-600">
-                    R$ {os.total.toFixed(2)}
-                  </span>
-                </div>
-              </div>
+              {(() => {
+                // Calcular subtotal somando os valores brutos dos itens (quantity * unitValue)
+                // Isso garante que o subtotal seja antes de qualquer desconto
+                const subtotal = os.items.reduce(
+                  (sum, item) => sum + item.quantity * item.unitValue,
+                  0
+                );
+                // Calcular valor do desconto em reais (desconto é percentual)
+                const discountValue =
+                  os.discount > 0 ? (subtotal * os.discount) / 100 : 0;
+
+                return (
+                  <>
+                    <div className="flex justify-between text-sm">
+                      <span className="text-gray-600">Subtotal:</span>
+                      <span className="font-medium">
+                        R$ {subtotal.toFixed(2)}
+                      </span>
+                    </div>
+                    {os.discount > 0 && (
+                      <div className="flex justify-between text-sm">
+                        <span className="text-gray-600">
+                          Desconto ({os.discount}%):
+                        </span>
+                        <span className="font-medium text-red-600">
+                          - R$ {discountValue.toFixed(2)}
+                        </span>
+                      </div>
+                    )}
+                    <div className="border-t pt-3">
+                      <div className="flex justify-between text-lg font-bold">
+                        <span>Total:</span>
+                        <span className="text-blue-600">
+                          R$ {os.total.toFixed(2)}
+                        </span>
+                      </div>
+                    </div>
+                  </>
+                );
+              })()}
             </div>
           </div>
 
