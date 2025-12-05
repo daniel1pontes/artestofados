@@ -18,7 +18,7 @@ const envSchema = z.object({
   WHATSAPP_SESSION_PATH: z.string().default("./whatsapp-sessions"),
   OPENAI_API_KEY: z.string().optional(),
   GOOGLE_API_CREDENTIALS: z.string().optional(),
-  FRONTEND_URL: z.string().default("http://localhost:3000"),
+  FRONTEND_URL: z.string().default("http://localhost:4040"),
   // Adicione outras variáveis de ambiente conforme necessário
 });
 

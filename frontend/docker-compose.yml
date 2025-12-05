@@ -7,7 +7,7 @@ services:
       dockerfile: Dockerfile
     container_name: artestofados-frontend
     ports:
-      - "${FRONTEND_PORT:-3000}:80"
+      - "${FRONTEND_PORT:-4040}:80"
     restart: unless-stopped
     # O backend deve estar na mesma rede Docker com o nome 'backend'
     # Para usar com o docker-compose principal, execute:

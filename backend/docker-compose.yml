@@ -13,7 +13,7 @@ services:
       WHATSAPP_SESSION_PATH: ${WHATSAPP_SESSION_PATH:-./whatsapp-sessions}
       OPENAI_API_KEY: ${OPENAI_API_KEY:-}
       GOOGLE_API_CREDENTIALS: ${GOOGLE_API_CREDENTIALS:-}
-      FRONTEND_URL: ${FRONTEND_URL:-http://localhost:3000}
+      FRONTEND_URL: ${FRONTEND_URL:-http://localhost:4040}
     ports:
       - "${PORT:-3001}:3001"
     volumes:
