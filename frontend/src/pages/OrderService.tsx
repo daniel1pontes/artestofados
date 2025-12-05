@@ -64,7 +64,7 @@ export default function OrderService() {
             clientPhone: data.clientPhone || "",
             clientAddress: data.clientAddress || "",
             deliveryDeadline: data.deliveryDeadline
-              ? new Date(data.deliveryDeadline).toISOString().split("T")[0]
+              ? data.deliveryDeadline.split("T")[0]
               : "",
             paymentMethod: data.paymentMethod || "",
             items: data.items || [

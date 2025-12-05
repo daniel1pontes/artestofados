@@ -280,7 +280,12 @@ export default function OrderServiceDetail() {
                     Prazo de Entrega
                   </label>
                   <p className="text-gray-900">
-                    {new Date(os.deliveryDeadline).toLocaleDateString("pt-BR")}
+                    {(() => {
+                      // Extrai apenas a parte da data (YYYY-MM-DD) da string ISO, ignorando timezone
+                      const dateOnly = os.deliveryDeadline.split("T")[0];
+                      const [year, month, day] = dateOnly.split("-");
+                      return `${day}/${month}/${year}`;
+                    })()}
                   </p>
                 </div>
               )}

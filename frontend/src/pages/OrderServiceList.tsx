@@ -86,13 +86,24 @@ export default function OrderServiceList() {
     }
   };
 
+  const formatDate = (dateString?: string): string => {
+    if (!dateString) return "-";
+    // Extrai apenas a parte da data (YYYY-MM-DD) da string ISO, ignorando timezone
+    const dateOnly = dateString.split("T")[0];
+    const [year, month, day] = dateOnly.split("-");
+    return `${day}/${month}/${year}`;
+  };
+
   const getDaysUntilDeadline = (deliveryDeadline?: string) => {
     if (!deliveryDeadline) return null;
 
     const today = new Date();
     today.setHours(0, 0, 0, 0);
 
-    const deadline = new Date(deliveryDeadline);
+    // Extrai apenas a parte da data (YYYY-MM-DD) da string ISO
+    const dateOnly = deliveryDeadline.split("T")[0];
+    const [year, month, day] = dateOnly.split("-");
+    const deadline = new Date(parseInt(year), parseInt(month) - 1, parseInt(day));
     deadline.setHours(0, 0, 0, 0);
 
     const diffTime = deadline.getTime() - today.getTime();
@@ -242,11 +253,7 @@ export default function OrderServiceList() {
                         )}
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 align-middle">
-                        {os.deliveryDeadline
-                          ? new Date(os.deliveryDeadline).toLocaleDateString(
-                              "pt-BR"
-                            )
-                          : "-"}
+                        {formatDate(os.deliveryDeadline)}
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 align-middle">
                         <div className="max-w-xs break-words">
