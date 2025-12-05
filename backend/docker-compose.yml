@@ -5,15 +5,15 @@ services:
     image: postgres:16-alpine
     container_name: estofados-postgres
     environment:
-      POSTGRES_USER: ${POSTGRES_USER:-postgres}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
-      POSTGRES_DB: ${POSTGRES_DB:-estofados}
+      POSTGRES_USER: artestofados
+      POSTGRES_PASSWORD: artestofados25
+      POSTGRES_DB: estofados_db
     ports:
       - "${POSTGRES_PORT:-5432}:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-postgres}"]
+      test: ["CMD-SHELL", "pg_isready -U artestofados"]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -28,7 +28,7 @@ services:
     environment:
       NODE_ENV: ${NODE_ENV:-production}
       PORT: ${PORT:-3001}
-      DATABASE_URL: ${DATABASE_URL:-postgresql://postgres:postgres@postgres:5432/estofados}
+      DATABASE_URL: ${DATABASE_URL:-postgresql://artestofados:artestofados25@localhost:5432/estofados_db}
       JWT_SECRET: ${JWT_SECRET}
       JWT_EXPIRES_IN: ${JWT_EXPIRES_IN:-7d}
       WHATSAPP_SESSION_PATH: ${WHATSAPP_SESSION_PATH:-./whatsapp-sessions}
