@@ -15,6 +15,7 @@ import {
   Trash2,
   Eye,
   X,
+  CheckCircle,
 } from "lucide-react";
 
 interface OrderService {
@@ -55,7 +56,7 @@ export default function OrderServiceDetail() {
   const [pdfBlobUrl, setPdfBlobUrl] = useState<string | null>(null);
   const [lastPdfPath, setLastPdfPath] = useState<string | null>(null);
 
-  const { data: os, isLoading } = useQuery<OrderService>({
+  const { data: os, isLoading, refetch } = useQuery<OrderService>({
     queryKey: ["os", id],
     queryFn: async () => {
       const response = await api.get(`/os/${id}`);
@@ -71,6 +72,17 @@ export default function OrderServiceDetail() {
     },
     onError: (error: any) => {
       toast.error(error.response?.data?.error || "Erro ao excluir OS");
+    },
+  });
+
+  const markAsDeliveredMutation = useMutation({
+    mutationFn: () => api.put(`/os/${id}`, { status: "COMPLETED" }),
+    onSuccess: () => {
+      toast.success("Ordem de Serviço marcada como entregue!");
+      refetch();
+    },
+    onError: (error: any) => {
+      toast.error(error.response?.data?.error || "Erro ao atualizar status da OS");
     },
   });
 
@@ -220,6 +232,28 @@ export default function OrderServiceDetail() {
         </div>
 
         <div className="flex items-center space-x-3">
+          {os.status !== "COMPLETED" && (
+            <button
+              onClick={() => {
+                if (
+                  window.confirm(
+                    "Tem certeza que deseja marcar esta Ordem de Serviço como entregue?"
+                  )
+                ) {
+                  markAsDeliveredMutation.mutate();
+                }
+              }}
+              disabled={markAsDeliveredMutation.isPending}
+              className="flex items-center space-x-2 bg-green-600 text-white py-2 px-4 rounded-md hover:bg-green-700 disabled:opacity-50"
+            >
+              <CheckCircle className="h-4 w-4" />
+              <span>
+                {markAsDeliveredMutation.isPending
+                  ? "Marcando..."
+                  : "Marcar como Entregue"}
+              </span>
+            </button>
+          )}
           <Link
             to={`/os/${os.id}/edit`}
             className="flex items-center space-x-2 bg-blue-600 text-white py-2 px-4 rounded-md hover:bg-blue-700"

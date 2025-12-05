@@ -43,10 +43,11 @@ const upload = multer({
 
 router.get("/", authenticateToken, async (req, res, next) => {
   try {
-    const { page = 1, limit = 10, search } = req.query;
+    const { page = 1, limit = 10, search, delayFilter } = req.query;
     const skip = (Number(page) - 1) * Number(limit);
 
-    const where = search
+    // Construir condições de busca
+    const searchConditions = search
       ? {
           OR: [
             {
@@ -70,6 +71,67 @@ router.get("/", authenticateToken, async (req, res, next) => {
           ],
         }
       : {};
+
+    // Construir condições de filtro de atraso
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+
+    let delayConditions: any = {};
+
+    if (delayFilter) {
+      switch (delayFilter) {
+        case "no-delay":
+          // Sem atraso: deliveryDeadline >= hoje ou null
+          delayConditions = {
+            OR: [
+              { deliveryDeadline: null },
+              { deliveryDeadline: { gte: today } },
+            ],
+          };
+          break;
+        case "delayed":
+          // Atrasadas: deliveryDeadline < hoje e não null
+          delayConditions = {
+            deliveryDeadline: {
+              lt: today,
+              not: null,
+            },
+          };
+          break;
+        case "7":
+        case "30":
+        case "60":
+          // Atrasadas mais de X dias
+          const days = parseInt(delayFilter as string);
+          const cutoffDate = new Date(today);
+          cutoffDate.setDate(cutoffDate.getDate() - days);
+          delayConditions = {
+            deliveryDeadline: {
+              lt: cutoffDate,
+              not: null,
+            },
+          };
+          break;
+        default:
+          // "all" ou qualquer outro valor: sem filtro de atraso
+          delayConditions = {};
+      }
+    }
+
+    // Combinar condições
+    // Se ambas as condições existem, precisamos combiná-las com AND
+    const where: any = {};
+    
+    if (Object.keys(searchConditions).length > 0 && Object.keys(delayConditions).length > 0) {
+      where.AND = [
+        searchConditions,
+        delayConditions,
+      ];
+    } else if (Object.keys(searchConditions).length > 0) {
+      Object.assign(where, searchConditions);
+    } else if (Object.keys(delayConditions).length > 0) {
+      Object.assign(where, delayConditions);
+    }
 
     const [os, total] = await Promise.all([
       prisma.orderService.findMany({

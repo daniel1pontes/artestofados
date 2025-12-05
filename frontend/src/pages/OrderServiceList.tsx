@@ -13,6 +13,7 @@ import {
   ChevronRight,
   FileText,
   Calendar,
+  Filter,
 } from "lucide-react";
 import toast from "react-hot-toast";
 
@@ -35,6 +36,7 @@ interface OrderService {
 export default function OrderServiceList() {
   const [search, setSearch] = useState("");
   const [page, setPage] = useState(1);
+  const [delayFilter, setDelayFilter] = useState<string>("all");
 
   const deleteMutation = useMutation({
     mutationFn: (id: string) => api.delete(`/os/${id}`),
@@ -50,12 +52,13 @@ export default function OrderServiceList() {
   const { data, isLoading, refetch } = useQuery<
     PaginatedResponse<OrderService>
   >({
-    queryKey: ["os-list", page, search],
+    queryKey: ["os-list", page, search, delayFilter],
     queryFn: async () => {
       const params = new URLSearchParams({
         page: page.toString(),
         limit: "10",
         ...(search && { search }),
+        ...(delayFilter && delayFilter !== "all" && { delayFilter }),
       });
       const response = await api.get(`/os?${params}`);
       return response.data;
@@ -130,7 +133,7 @@ export default function OrderServiceList() {
         </Link>
       </div>
 
-      {/* Search */}
+      {/* Search and Filters */}
       <div className="bg-white p-4 rounded-lg shadow mb-6">
         <div className="flex items-center space-x-4">
           <div className="flex-1 relative">
@@ -145,6 +148,24 @@ export default function OrderServiceList() {
               }}
               className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
             />
+          </div>
+          <div className="flex items-center space-x-2">
+            <Filter className="h-5 w-5 text-gray-400" />
+            <select
+              value={delayFilter}
+              onChange={(e) => {
+                setDelayFilter(e.target.value);
+                setPage(1);
+              }}
+              className="px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
+            >
+              <option value="all">Todas as OS</option>
+              <option value="no-delay">Sem atraso</option>
+              <option value="delayed">Atrasadas (qualquer)</option>
+              <option value="7">Atrasadas mais de 7 dias</option>
+              <option value="30">Atrasadas mais de 30 dias</option>
+              <option value="60">Atrasadas mais de 60 dias</option>
+            </select>
           </div>
         </div>
       </div>
