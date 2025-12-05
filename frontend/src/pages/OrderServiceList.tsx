@@ -242,7 +242,14 @@ export default function OrderServiceList() {
                         </div>
                       </td>
                       <td className="px-6 py-4 align-middle">
-                        {os.deliveryDeadline ? (
+                        {os.status === "COMPLETED" ? (
+                          <div className="flex items-center space-x-1">
+                            <Calendar className="h-3 w-3 text-green-600" />
+                            <span className="text-xs font-medium text-green-600">
+                              Entregue
+                            </span>
+                          </div>
+                        ) : os.deliveryDeadline ? (
                           <div className="flex items-center space-x-1">
                             <Calendar className="h-3 w-3 text-gray-400" />
                             <span

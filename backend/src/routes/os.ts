@@ -133,6 +133,16 @@ router.get("/", authenticateToken, async (req, res, next) => {
       Object.assign(where, delayConditions);
     }
 
+    // Determinar ordenação baseada no filtro de atraso
+    // Se o filtro de atraso estiver ativo, ordenar por deliveryDeadline (mais atrasadas primeiro)
+    // Caso contrário, ordenar por createdAt (mais recentes primeiro)
+    let orderBy: any = { createdAt: "desc" };
+    
+    if (delayFilter && delayFilter !== "all" && delayFilter !== "no-delay") {
+      // Para filtros de atraso, ordenar por deliveryDeadline crescente (datas menores = mais atrasadas)
+      orderBy = { deliveryDeadline: "asc" };
+    }
+
     const [os, total] = await Promise.all([
       prisma.orderService.findMany({
         where,
@@ -142,7 +152,7 @@ router.get("/", authenticateToken, async (req, res, next) => {
             select: { id: true, name: true, email: true },
           },
         },
-        orderBy: { createdAt: "desc" },
+        orderBy,
         skip,
         take: Number(limit),
       }),
