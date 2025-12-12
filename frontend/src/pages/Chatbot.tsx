@@ -90,7 +90,7 @@ export default function Chatbot() {
   const connectWhatsApp = async () => {
     try {
       setIsConnecting(true);
-      const response = await api.post("/whatsapp/connect");
+      await api.post("/whatsapp/connect");
 
       toast.success("QR Code gerado com sucesso");
       setIsConnecting(false);
