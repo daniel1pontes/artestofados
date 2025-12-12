@@ -10,6 +10,7 @@ import GoogleCalendarService, {
 } from "./GoogleCalendarService";
 import { DateTimeParser } from "../utils/DateTimeParser";
 import { createLogger } from "../utils/logger";
+import { config } from "../config/environment";
 
 const prisma = new PrismaClient();
 
@@ -128,6 +129,9 @@ class AppointmentService {
     const conflicts = await prisma.appointment.count({
       where: {
         type,
+        status: {
+          notIn: ["CANCELLED", "NO_SHOW"],
+        },
         OR: [
           { start: { gte: start, lt: end } },
           { end: { gt: start, lte: end } },
@@ -229,6 +233,202 @@ class AppointmentService {
     return DateTimeParser.isWeekday(date);
   }
 
+  async cancelAppointment(appointmentId: string, userId: string) {
+    const appointment = await prisma.appointment.findUnique({
+      where: { id: appointmentId },
+    });
+
+    if (!appointment) {
+      throw new Error("Agendamento não encontrado.");
+    }
+
+    if (appointment.status === "CANCELLED") {
+      throw new Error("Este agendamento já foi cancelado.");
+    }
+
+    // Remover do Google Calendar se existir
+    if (appointment.gcalEventId) {
+      try {
+        await this.googleCalendar.deleteAppointment(appointment.gcalEventId);
+        this.logger.info("Evento removido do Google Calendar", {
+          appointmentId: appointment.id,
+          gcalEventId: appointment.gcalEventId,
+        });
+      } catch (error) {
+        this.logger.error(
+          "Falha ao remover evento do Google Calendar",
+          error instanceof Error ? error : new Error(String(error)),
+          {
+            appointmentId: appointment.id,
+            gcalEventId: appointment.gcalEventId,
+          }
+        );
+        // Continua mesmo se falhar a remoção do Calendar
+      }
+    }
+
+    // Atualizar status no banco
+    const updatedAppointment = await prisma.appointment.update({
+      where: { id: appointmentId },
+      data: {
+        status: "CANCELLED",
+        lastEditedBy: userId,
+        gcalStatus: "cancelled",
+      },
+      include: {
+        createdByUser: {
+          select: { name: true, email: true },
+        },
+      },
+    });
+
+    this.logger.info("Agendamento cancelado", {
+      appointmentId: appointment.id,
+      clientName: appointment.clientName,
+    });
+
+    return updatedAppointment;
+  }
+
+  async rescheduleAppointment(
+    appointmentId: string,
+    newStart: Date,
+    newEnd: Date,
+    userId: string
+  ) {
+    const oldAppointment = await prisma.appointment.findUnique({
+      where: { id: appointmentId },
+    });
+
+    if (!oldAppointment) {
+      throw new Error("Agendamento não encontrado.");
+    }
+
+    if (oldAppointment.status === "CANCELLED") {
+      throw new Error("Não é possível reagendar um agendamento cancelado.");
+    }
+
+    // Validar novo horário
+    this.ensureBusinessRules(newStart, newEnd);
+
+    const availability = await this.validateAppointment(
+      newStart,
+      newEnd,
+      oldAppointment.type
+    );
+
+    if (!availability.isValid) {
+      throw new Error(availability.message);
+    }
+
+    // Remover evento antigo do Google Calendar
+    if (oldAppointment.gcalEventId) {
+      try {
+        await this.googleCalendar.deleteAppointment(oldAppointment.gcalEventId);
+        this.logger.info("Evento antigo removido do Google Calendar", {
+          appointmentId: oldAppointment.id,
+          gcalEventId: oldAppointment.gcalEventId,
+        });
+      } catch (error) {
+        this.logger.error(
+          "Falha ao remover evento antigo do Google Calendar",
+          error instanceof Error ? error : new Error(String(error)),
+          {
+            appointmentId: oldAppointment.id,
+            gcalEventId: oldAppointment.gcalEventId,
+          }
+        );
+        // Continua mesmo se falhar
+      }
+    }
+
+    // Excluir agendamento antigo do banco de dados
+    await prisma.appointment.delete({
+      where: { id: appointmentId },
+    });
+
+    this.logger.info("Agendamento antigo excluído do banco de dados", {
+      appointmentId: oldAppointment.id,
+      clientName: oldAppointment.clientName,
+      oldStart: oldAppointment.start,
+    });
+
+    // Criar novo agendamento com os novos horários
+    const newAppointment = await prisma.appointment.create({
+      data: {
+        clientName: oldAppointment.clientName,
+        clientPhone: oldAppointment.clientPhone,
+        type: oldAppointment.type,
+        start: newStart,
+        end: newEnd,
+        createdBy: userId,
+        lastEditedBy: userId,
+      },
+    });
+
+    this.logger.info("Novo agendamento criado", {
+      newAppointmentId: newAppointment.id,
+      oldAppointmentId: oldAppointment.id,
+      clientName: newAppointment.clientName,
+      newStart,
+      newEnd,
+    });
+
+    // Criar novo evento no Google Calendar
+    try {
+      await this.syncWithCalendar(newAppointment);
+      this.logger.info("Novo evento criado no Google Calendar", {
+        appointmentId: newAppointment.id,
+        newStart,
+        newEnd,
+      });
+    } catch (error) {
+      this.logger.error(
+        "Falha ao criar novo evento no Google Calendar",
+        error instanceof Error ? error : new Error(String(error)),
+        {
+          appointmentId: newAppointment.id,
+          newStart,
+          newEnd,
+        }
+      );
+      // Não lança erro para não impedir o reagendamento
+    }
+
+    return prisma.appointment.findUnique({
+      where: { id: newAppointment.id },
+      include: {
+        createdByUser: {
+          select: { name: true, email: true },
+        },
+      },
+    });
+  }
+
+  async findActiveAppointmentByPhone(phone: string) {
+    const appointment = await prisma.appointment.findFirst({
+      where: {
+        clientPhone: phone,
+        status: {
+          in: ["SCHEDULED", "CONFIRMED"],
+        },
+        start: {
+          gte: new Date(),
+        },
+      },
+      orderBy: {
+        start: "asc",
+      },
+      include: {
+        createdByUser: {
+          select: { name: true, email: true },
+        },
+      },
+    });
+
+    return appointment;
+  }
+
   private async syncWithCalendar(appointment: Appointment) {
     this.logger.info("Iniciando sincronização com Google Calendar", {
       appointmentId: appointment.id,
@@ -266,6 +466,9 @@ class AppointmentService {
       where: { id: appointment.id },
       data: {
         gcalEventId: calendarEvent.id,
+        gcalCalendarId: config.google.calendarId,
+        gcalSyncedAt: new Date(),
+        gcalStatus: "synced",
         meetLink: calendarEvent.conferenceData?.entryPoints?.[0]?.uri,
       },
     });

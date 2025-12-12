@@ -1,20 +1,20 @@
 import { Client, LocalAuth, Message } from "whatsapp-web.js";
 import { PrismaClient } from "@prisma/client";
 import QRCode from "qrcode";
-import ChatbotService from "./ChatbotService";
+import ChatbotOrchestratorService from "./ChatbotOrchestratorService";
 
 const prisma = new PrismaClient();
 
 class WhatsAppService {
   private client: Client | null = null;
   private qrCode: string | null = null;
-  private chatbotService: ChatbotService;
+  private chatbotOrchestrator: ChatbotOrchestratorService;
   private botEnabled: boolean = false;
   private connectionAttempts: number = 0;
   private readonly maxConnectionAttempts: number = 3;
 
   constructor() {
-    this.chatbotService = new ChatbotService();
+    this.chatbotOrchestrator = new ChatbotOrchestratorService();
     this.botEnabled = true; // Bot começa ativado por padrão
     this.initializeClient();
   }
@@ -119,11 +119,6 @@ class WhatsAppService {
         return;
       }
 
-      // Ignorar mensagens de grupos
-      if (message.fromMe) {
-        return; // Ignorar mensagens próprias
-      }
-
       const chat = await message.getChat();
 
       // Verificar se é um grupo e ignorar
@@ -132,10 +127,27 @@ class WhatsAppService {
         return;
       }
 
-      // Ignorar mensagens de mídia
-      // if (message.hasMedia) {
-      //   return;
-      // }
+      // Extrair número do telefone
+      const phoneNumber = message.from.replace("@c.us", "").replace("@g.us", "");
+
+      // NOVA LÓGICA: Detectar interferência humana
+      // Se a mensagem foi enviada pelo número conectado (fromMe = true),
+      // significa que um atendente respondeu manualmente
+      if (message.fromMe) {
+        console.log(`🚨 Interferência humana detectada para ${phoneNumber}`);
+        await this.handleHumanIntervention(phoneNumber);
+        return; // Não processar mensagem do próprio atendente
+      }
+
+      // NOVA LÓGICA: Verificar se a conversa está pausada
+      const isPaused = await this.chatbotOrchestrator.isConversationPaused(phoneNumber);
+      if (isPaused) {
+        const remainingMinutes = await this.chatbotOrchestrator.getPauseTimeRemaining(phoneNumber);
+        console.log(
+          `⏸️ Conversa pausada para ${phoneNumber}. Tempo restante: ${remainingMinutes} minutos`
+        );
+        return; // Não responder, chatbot está pausado
+      }
 
       // Processar mensagem de chat privado
       let messageBody = message.body;
@@ -155,19 +167,24 @@ class WhatsAppService {
 
       console.log(`Processando mensagem de ${message.from}: ${messageBody}`);
 
-      // Gerar sessionId baseado no número do remetente
-      const sessionId = message.from.replace("@c.us", "").replace("@g.us", "");
-
-      // Obter resposta do chatbot
-      const response = await this.chatbotService.sendMessage(
-        sessionId,
+      // Processar mensagem usando o orquestrador (que cria agendamentos automaticamente)
+      const response = await this.chatbotOrchestrator.processMessage(
+        phoneNumber,
         messageBody
       );
 
       // Enviar resposta
-      await message.reply(response);
+      await message.reply(response.message);
 
-      console.log(`Resposta enviada para ${message.from}: ${response}`);
+      // Log adicional se agendamento foi criado
+      if (response.appointmentCreated) {
+        console.log(`✅ Agendamento criado via WhatsApp:`, {
+          appointmentId: response.appointmentId,
+          phoneNumber,
+        });
+      }
+
+      console.log(`Resposta enviada para ${message.from}: ${response.message}`);
     } catch (error) {
       console.error("Erro ao processar mensagem:", error);
     }
@@ -371,6 +388,25 @@ class WhatsAppService {
 
   async isConnected(): Promise<boolean> {
     return this.client ? this.client.info !== null : false;
+  }
+
+  /**
+   * Trata interferência humana pausando o chatbot por 2 horas
+   */
+  private async handleHumanIntervention(phoneNumber: string): Promise<void> {
+    try {
+      // Pausar por 2 horas
+      await this.chatbotOrchestrator.pauseConversation(phoneNumber, 2);
+      
+      console.log(
+        `✅ Chatbot pausado por 2 horas para ${phoneNumber} devido à interferência humana`
+      );
+    } catch (error) {
+      console.error(
+        `Erro ao pausar chatbot para ${phoneNumber}:`,
+        error
+      );
+    }
   }
 
   // Métodos para controlar o bot

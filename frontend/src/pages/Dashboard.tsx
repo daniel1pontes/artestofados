@@ -32,50 +32,59 @@ export default function Dashboard() {
       weekEnd.setDate(weekEnd.getDate() + 6);
       weekEnd.setHours(23, 59, 59, 999);
 
+      // Calcular início e fim do dia atual
+      const dayStart = new Date(today);
+      dayStart.setHours(0, 0, 0, 0);
+      const dayEnd = new Date(today);
+      dayEnd.setHours(23, 59, 59, 999);
+
       const [appointmentsToday, appointmentsThisWeek, totalOS] =
         await Promise.all([
+          // Buscar agendamentos do dia atual
           api
-            .get(
-              `/appointments?week=${Math.ceil(
-                (today.getTime() - weekStart.getTime()) /
-                  (7 * 24 * 60 * 60 * 1000)
-              )}`
-            )
-            .then(
-              (res) =>
-                res.data.filter((apt: any) => {
-                  const aptDate = new Date(apt.start);
-                  return aptDate.toDateString() === today.toDateString();
-                }).length
-            ),
-          api.get("/appointments").then((res) => res.data.length),
+            .get("/appointments", {
+              params: {
+                start: dayStart.toISOString(),
+                end: dayEnd.toISOString(),
+              },
+            })
+            .then((res) => {
+              const todayAppointments = (res.data || []).filter((apt: any) => {
+                const aptDate = new Date(apt.start);
+                // Normalizar ambas as datas para o mesmo timezone (local) antes de comparar
+                const aptDateNormalized = new Date(aptDate.getFullYear(), aptDate.getMonth(), aptDate.getDate());
+                const todayNormalized = new Date(today.getFullYear(), today.getMonth(), today.getDate());
+                return aptDateNormalized.getTime() === todayNormalized.getTime();
+              });
+              return todayAppointments.length;
+            }),
+          // Buscar agendamentos da semana atual
+          api
+            .get("/appointments", {
+              params: {
+                start: weekStart.toISOString(),
+                end: weekEnd.toISOString(),
+              },
+            })
+            .then((res) => (res.data || []).length),
+          // Buscar total de OS
           api
             .get("/os/stats/count")
             .then((res) => {
-              // A resposta deve ser { total: number }
               const total = res.data?.total;
-              console.log("📊 Total de OS da API:", total);
               return typeof total === 'number' ? total : 0;
             })
             .catch((error) => {
               console.error("❌ Erro ao buscar total de OS:", error);
-              // Fallback: tentar buscar pela rota normal
-              return api
-                .get("/os", { params: { page: 1, limit: 1 } })
-                .then((res) => res.data?.pagination?.total ?? res.data?.data?.length ?? 0)
-                .catch(() => 0);
+              return 0;
             }),
         ]);
 
-      const result = {
+      return {
         appointmentsToday,
         appointmentsThisWeek,
         totalOS: Number(totalOS) || 0,
       };
-      
-      console.log("📊 Valores calculados:", result);
-
-      return result;
     },
   });
 
@@ -100,7 +109,7 @@ export default function Dashboard() {
         },
       });
 
-      return res.data;
+      return res.data || [];
     },
   });
 
@@ -139,12 +148,17 @@ export default function Dashboard() {
     // Filter appointments for today only
     const todayAppointments = appointments.filter((apt) => {
       const aptDate = new Date(apt.start);
-      return aptDate.toDateString() === today.toDateString();
+      // Normalizar ambas as datas para o mesmo timezone (local) antes de comparar
+      const aptDateNormalized = new Date(aptDate.getFullYear(), aptDate.getMonth(), aptDate.getDate());
+      const todayNormalized = new Date(today.getFullYear(), today.getMonth(), today.getDate());
+      return aptDateNormalized.getTime() === todayNormalized.getTime();
     });
 
     // Group appointments by time
     const appointmentsByTime = todayAppointments.reduce((acc, apt) => {
-      const hour = new Date(apt.start).getHours();
+      const aptDate = new Date(apt.start);
+      // Usar hora local para agrupar corretamente
+      const hour = aptDate.getHours();
       const timeKey = `${hour.toString().padStart(2, "0")}:00`;
 
       if (!acc[timeKey]) acc[timeKey] = [];

@@ -128,7 +128,7 @@ class PDFService {
     doc
       .fontSize(18)
       .font("Helvetica-Bold")
-      .text("ORDEM DE SERVIÇO", 50, 110, { align: "center", width: 495 });
+      .text("ORDEM DE SERVIÇO", 50, 140, { align: "center", width: 495 });
 
     doc.moveDown(1);
   }
@@ -514,7 +514,7 @@ class PDFService {
       doc.font("Helvetica-Bold").fontSize(9).fillColor("#000000");
       doc.text("DESCONTO", margemEsq + 5, currentY + 8, {
         width: larguraTexto - 10,
-        align: "right",
+        align: "center",
       });
       doc.text(
         `- ${this.formatarMoeda(descontoGeral)}`,
@@ -541,7 +541,7 @@ class PDFService {
     doc.font("Helvetica-Bold").fontSize(11).fillColor("#000000"); // Aumenta a fonte para o total
     doc.text("VALOR TOTAL", margemEsq + 5, currentY + 8, {
       width: larguraTexto - 10,
-      align: "right",
+      align: "center",
     });
     doc.text(this.formatarMoeda(valorTotal), posXValor + 3, currentY + 8, {
       width: colunaValorTotal.width - 6,
@@ -592,7 +592,7 @@ class PDFService {
       .fontSize(11)
       .font("Helvetica")
       .fillColor("#000000")
-      .text(`João Pessoa, ${dataAtual}`, 50, posYAssinatura - 80, {
+      .text(`João Pessoa, ${dataAtual};`, 50, posYAssinatura - 80, {
         align: "right",
         width: 495, // Usa a largura total da área útil
       });

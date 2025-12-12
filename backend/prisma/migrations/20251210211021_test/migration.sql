@@ -10,6 +10,15 @@ CREATE TYPE "OSStatus" AS ENUM ('PENDING', 'APPROVED', 'REJECTED', 'COMPLETED');
 -- CreateEnum
 CREATE TYPE "WhatsappStatus" AS ENUM ('CONNECTED', 'DISCONNECTED', 'PAUSED');
 
+-- CreateEnum
+CREATE TYPE "AppointmentStatus" AS ENUM ('SCHEDULED', 'CONFIRMED', 'CANCELLED', 'COMPLETED', 'NO_SHOW');
+
+-- CreateEnum
+CREATE TYPE "ConversationState" AS ENUM ('INTRO', 'ASKING_NAME', 'ASKING_SERVICE', 'ASKING_APPOINTMENT_TYPE', 'ASKING_DATE', 'ASKING_TIME', 'CONFIRMING', 'COMPLETED');
+
+-- CreateEnum
+CREATE TYPE "ConversationRole" AS ENUM ('USER', 'BOT');
+
 -- CreateTable
 CREATE TABLE "users" (
     "id" TEXT NOT NULL,
@@ -58,14 +67,19 @@ CREATE TABLE "appointments" (
     "clientName" TEXT NOT NULL,
     "clientPhone" TEXT NOT NULL,
     "type" "AppointmentType" NOT NULL,
+    "start" TIMESTAMP(3) NOT NULL,
+    "end" TIMESTAMP(3) NOT NULL,
+    "gcalEventId" TEXT,
+    "gcalCalendarId" TEXT,
+    "gcalStatus" TEXT,
+    "gcalSyncedAt" TIMESTAMP(3),
+    "meetLink" TEXT,
+    "notes" TEXT,
+    "status" "AppointmentStatus" NOT NULL DEFAULT 'SCHEDULED',
     "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "updatedAt" TIMESTAMP(3) NOT NULL,
     "createdBy" TEXT NOT NULL,
     "lastEditedBy" TEXT NOT NULL,
-    "date" TIMESTAMP(3) NOT NULL,
-    "googleEventId" TEXT,
-    "meetLink" TEXT,
-    "time" TEXT NOT NULL,
 
     CONSTRAINT "appointments_pkey" PRIMARY KEY ("id")
 );
@@ -74,7 +88,7 @@ CREATE TABLE "appointments" (
 CREATE TABLE "order_services" (
     "id" TEXT NOT NULL,
     "clientName" TEXT NOT NULL,
-    "clientPhone" TEXT NOT NULL,
+    "clientPhone" TEXT,
     "clientEmail" TEXT,
     "clientAddress" TEXT,
     "deliveryDeadline" TIMESTAMP(3),
@@ -131,20 +145,50 @@ CREATE TABLE "audit_logs" (
     CONSTRAINT "audit_logs_pkey" PRIMARY KEY ("id")
 );
 
+-- CreateTable
+CREATE TABLE "conversation_sessions" (
+    "id" TEXT NOT NULL,
+    "phoneNumber" TEXT NOT NULL,
+    "clientName" TEXT,
+    "serviceIntent" TEXT,
+    "appointmentType" "AppointmentType",
+    "state" "ConversationState" NOT NULL DEFAULT 'INTRO',
+    "context" JSONB,
+    "scheduledAppointmentId" TEXT,
+    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updatedAt" TIMESTAMP(3) NOT NULL,
+
+    CONSTRAINT "conversation_sessions_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateTable
+CREATE TABLE "conversation_messages" (
+    "id" TEXT NOT NULL,
+    "conversationId" TEXT NOT NULL,
+    "role" "ConversationRole" NOT NULL,
+    "content" TEXT NOT NULL,
+    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+
+    CONSTRAINT "conversation_messages_pkey" PRIMARY KEY ("id")
+);
+
 -- CreateIndex
 CREATE UNIQUE INDEX "users_email_key" ON "users"("email");
 
 -- CreateIndex
 CREATE UNIQUE INDEX "sessions_phoneNumber_key" ON "sessions"("phoneNumber");
 
+-- CreateIndex
+CREATE UNIQUE INDEX "conversation_sessions_phoneNumber_key" ON "conversation_sessions"("phoneNumber");
+
 -- AddForeignKey
 ALTER TABLE "sessions" ADD CONSTRAINT "sessions_createdBy_fkey" FOREIGN KEY ("createdBy") REFERENCES "users"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
 
 -- AddForeignKey
-ALTER TABLE "messages" ADD CONSTRAINT "messages_createdBy_fkey" FOREIGN KEY ("createdBy") REFERENCES "users"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+ALTER TABLE "messages" ADD CONSTRAINT "messages_sessionId_fkey" FOREIGN KEY ("sessionId") REFERENCES "sessions"("id") ON DELETE CASCADE ON UPDATE CASCADE;
 
 -- AddForeignKey
-ALTER TABLE "messages" ADD CONSTRAINT "messages_sessionId_fkey" FOREIGN KEY ("sessionId") REFERENCES "sessions"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+ALTER TABLE "messages" ADD CONSTRAINT "messages_createdBy_fkey" FOREIGN KEY ("createdBy") REFERENCES "users"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
 
 -- AddForeignKey
 ALTER TABLE "appointments" ADD CONSTRAINT "appointments_createdBy_fkey" FOREIGN KEY ("createdBy") REFERENCES "users"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
@@ -160,3 +204,6 @@ ALTER TABLE "order_services" ADD CONSTRAINT "order_services_lastEditedBy_fkey" F
 
 -- AddForeignKey
 ALTER TABLE "order_items" ADD CONSTRAINT "order_items_osId_fkey" FOREIGN KEY ("osId") REFERENCES "order_services"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "conversation_messages" ADD CONSTRAINT "conversation_messages_conversationId_fkey" FOREIGN KEY ("conversationId") REFERENCES "conversation_sessions"("id") ON DELETE CASCADE ON UPDATE CASCADE;

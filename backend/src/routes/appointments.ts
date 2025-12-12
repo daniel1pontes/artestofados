@@ -4,6 +4,7 @@ import { authenticateToken } from "../middleware/auth";
 import { createError } from "../middleware/errorHandler";
 import AppointmentService from "../services/AppointmentService";
 import GoogleCalendarService from "../services/GoogleCalendarService";
+import { config } from "../config/environment";
 import { z } from "zod";
 
 const router = Router();
@@ -33,12 +34,25 @@ router.get("/", authenticateToken, async (req, res, next) => {
 
     const where: any = {};
 
-    if (start) {
-      where.start = { gte: new Date(start as string) };
-    }
-
-    if (end) {
-      where.end = { lte: new Date(end as string) };
+    // Filtro de sobreposição de intervalos: um agendamento se sobrepõe ao intervalo [start, end]
+    // se appointment.start < end E appointment.end > start
+    if (start && end) {
+      const startDate = new Date(start as string);
+      const endDate = new Date(end as string);
+      
+      // Lógica correta de sobreposição: um agendamento se sobrepõe se:
+      // - começa antes ou no fim do intervalo E
+      // - termina depois ou no início do intervalo
+      where.AND = [
+        { start: { lte: endDate } }, // O agendamento começa antes ou no fim do intervalo
+        { end: { gte: startDate } }, // O agendamento termina depois ou no início do intervalo
+      ];
+    } else if (start) {
+      // Se só tem start, busca agendamentos que terminam depois ou no start
+      where.end = { gte: new Date(start as string) };
+    } else if (end) {
+      // Se só tem end, busca agendamentos que começam antes ou no end
+      where.start = { lte: new Date(end as string) };
     }
 
     if (type) {
@@ -140,11 +154,11 @@ router.post("/", authenticateToken, async (req, res, next) => {
   }
 });
 
-// Atualizar agendamento
+// Atualizar agendamento (apenas dados do cliente, não horário)
 router.put("/:id", authenticateToken, async (req, res, next) => {
   try {
     const { id } = req.params;
-    const { clientName, clientPhone, type, date, time } = req.body;
+    const { clientName, clientPhone, notes, status } = req.body;
     const userId = (req as any).user.id;
 
     const existingAppointment = await prisma.appointment.findUnique({
@@ -161,32 +175,8 @@ router.put("/:id", authenticateToken, async (req, res, next) => {
 
     if (clientName) updateData.clientName = clientName;
     if (clientPhone) updateData.clientPhone = clientPhone;
-    if (type) updateData.type = type as "ONLINE" | "IN_STORE";
-
-    if (date && time) {
-      const startDateTime = appointmentService.parseDateTime(date, time);
-
-      if (!startDateTime) {
-        throw createError("Data ou horário inválido", 400);
-      }
-
-      const endDateTime = new Date(startDateTime);
-      endDateTime.setHours(endDateTime.getHours() + 1);
-
-      // Validar novo horário
-      const validation = await appointmentService.validateAppointment(
-        startDateTime,
-        endDateTime,
-        type || existingAppointment.type
-      );
-
-      if (!validation.isValid) {
-        throw createError(validation.message, 400);
-      }
-
-      updateData.start = startDateTime;
-      updateData.end = endDateTime;
-    }
+    if (notes !== undefined) updateData.notes = notes;
+    if (status) updateData.status = status;
 
     const updatedAppointment = await prisma.appointment.update({
       where: { id },
@@ -207,7 +197,65 @@ router.put("/:id", authenticateToken, async (req, res, next) => {
   }
 });
 
-// Deletar agendamento
+// Reagendar (mudar data/horário) - Remove evento antigo do Google Calendar e cria novo
+router.put("/:id/reschedule", authenticateToken, async (req, res, next) => {
+  try {
+    const { id } = req.params;
+    const { date, time } = req.body;
+    const userId = (req as any).user.id;
+
+    if (!date || !time) {
+      throw createError("Data e horário são obrigatórios", 400);
+    }
+
+    const startDateTime = appointmentService.parseDateTime(date, time);
+
+    if (!startDateTime) {
+      throw createError("Data ou horário inválido", 400);
+    }
+
+    const endDateTime = new Date(startDateTime);
+    endDateTime.setHours(endDateTime.getHours() + 1);
+
+    const rescheduledAppointment = await appointmentService.rescheduleAppointment(
+      id,
+      startDateTime,
+      endDateTime,
+      userId
+    );
+
+    res.json({
+      success: true,
+      appointment: rescheduledAppointment,
+      message: "Agendamento remarcado com sucesso",
+    });
+  } catch (error) {
+    next(error);
+  }
+});
+
+// Cancelar agendamento - Remove do Google Calendar e marca como cancelado
+router.post("/:id/cancel", authenticateToken, async (req, res, next) => {
+  try {
+    const { id } = req.params;
+    const userId = (req as any).user.id;
+
+    const cancelledAppointment = await appointmentService.cancelAppointment(
+      id,
+      userId
+    );
+
+    res.json({
+      success: true,
+      appointment: cancelledAppointment,
+      message: "Agendamento cancelado com sucesso",
+    });
+  } catch (error) {
+    next(error);
+  }
+});
+
+// Deletar agendamento permanentemente (não recomendado - use cancelar)
 router.delete("/:id", authenticateToken, async (req, res, next) => {
   try {
     const { id } = req.params;
@@ -220,11 +268,19 @@ router.delete("/:id", authenticateToken, async (req, res, next) => {
       throw createError("Agendamento não encontrado", 404);
     }
 
+    // Remover do Google Calendar se existir
+    if (appointment.gcalEventId) {
+      await googleCalendarService.deleteAppointment(appointment.gcalEventId);
+    }
+
     await prisma.appointment.delete({
       where: { id },
     });
 
-    res.json({ success: true });
+    res.json({ 
+      success: true,
+      message: "Agendamento deletado permanentemente" 
+    });
   } catch (error) {
     next(error);
   }
@@ -365,7 +421,7 @@ router.post("/:id/sync-calendar", authenticateToken, async (req, res, next) => {
         where: { id },
         data: {
           gcalEventId: calendarEvent.id,
-          gcalCalendarId: "primary",
+          gcalCalendarId: config.google.calendarId,
           gcalSyncedAt: new Date(),
           gcalStatus: "synced",
           meetLink: calendarEvent.conferenceData?.entryPoints?.[0]?.uri,

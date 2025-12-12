@@ -27,8 +27,10 @@ class GoogleCalendarService {
   private calendar: ReturnType<typeof google.calendar> | null = null;
   private logger = createLogger("GoogleCalendarService");
   private readonly timezone = "America/Sao_Paulo";
+  private readonly calendarId: string;
 
   constructor() {
+    this.calendarId = config.google.calendarId || "primary";
     this.initialize();
   }
 
@@ -59,6 +61,7 @@ class GoogleCalendarService {
       this.logger.info("Google Calendar inicializado com sucesso", {
         projectId: credentials.project_id,
         clientEmail: credentials.client_email,
+        calendarId: this.calendarId,
       });
     } catch (error) {
       const errorObj = this.toError(error);
@@ -88,7 +91,7 @@ class GoogleCalendarService {
       });
 
       const response = await this.calendar.events.insert({
-        calendarId: "primary",
+        calendarId: this.calendarId,
         conferenceDataVersion: 1,
         requestBody: eventPayload,
       });
@@ -153,7 +156,7 @@ class GoogleCalendarService {
 
     try {
       const existing = await this.calendar.events.get({
-        calendarId: "primary",
+        calendarId: this.calendarId,
         eventId,
       });
 
@@ -176,7 +179,7 @@ class GoogleCalendarService {
       };
 
       const response = await this.calendar.events.update({
-        calendarId: "primary",
+        calendarId: this.calendarId,
         eventId,
         conferenceDataVersion: 1,
         requestBody: merged,
@@ -199,7 +202,7 @@ class GoogleCalendarService {
 
     try {
       await this.calendar.events.delete({
-        calendarId: "primary",
+        calendarId: this.calendarId,
         eventId,
       });
       return true;
@@ -219,7 +222,7 @@ class GoogleCalendarService {
 
     try {
       const response = await this.calendar.events.list({
-        calendarId: "primary",
+        calendarId: this.calendarId,
         timeMin: start.toISOString(),
         timeMax: end.toISOString(),
         singleEvents: true,

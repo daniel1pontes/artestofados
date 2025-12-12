@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { useQuery } from "@tanstack/react-query";
 import { api } from "../services/api";
 import {
   Calendar,
@@ -29,31 +30,23 @@ interface WhatsAppStatus {
 
 export default function Chatbot() {
   const [isBotEnabled, setIsBotEnabled] = useState(true);
-  const [whatsappStatus, setWhatsappStatus] = useState<WhatsAppStatus | null>(
-    null
-  );
-  const [appointments, setAppointments] = useState<Appointment[]>([]);
-  const [isLoadingAppointments, setIsLoadingAppointments] = useState(true);
   const [currentWeekOffset, setCurrentWeekOffset] = useState(0);
   const [isConnecting, setIsConnecting] = useState(false);
 
-  useEffect(() => {
-    fetchWhatsAppStatus();
-    fetchWeeklyAppointments();
-  }, [currentWeekOffset]);
-
-  const fetchWhatsAppStatus = async () => {
-    try {
+  // Buscar status do WhatsApp usando useQuery
+  const { data: whatsappStatus, refetch: refetchWhatsAppStatus } = useQuery<WhatsAppStatus>({
+    queryKey: ["whatsapp-status"],
+    queryFn: async () => {
       const response = await api.get("/whatsapp/status");
-      setWhatsappStatus(response.data);
-    } catch (error: any) {
-      console.error("Error fetching WhatsApp status:", error);
-    }
-  };
+      return response.data;
+    },
+    refetchInterval: 5000, // Atualizar a cada 5 segundos quando estiver conectando
+  });
 
-  const fetchWeeklyAppointments = async () => {
-    try {
-      setIsLoadingAppointments(true);
+  // Buscar agendamentos usando useQuery
+  const { data: appointments = [], isLoading: isLoadingAppointments } = useQuery<Appointment[]>({
+    queryKey: ["weekly-appointments", currentWeekOffset],
+    queryFn: async () => {
       const today = new Date();
       const weekStart = new Date(today);
       weekStart.setDate(
@@ -72,14 +65,14 @@ export default function Chatbot() {
         },
       });
 
-      setAppointments(response.data || []);
-    } catch (error: any) {
-      console.error("Error fetching appointments:", error);
-      toast.error("Erro ao carregar agendamentos");
-    } finally {
-      setIsLoadingAppointments(false);
-    }
-  };
+      return response.data || [];
+    },
+    refetchInterval: 30000, // Atualizar a cada 30 segundos
+  });
+
+  useEffect(() => {
+    refetchWhatsAppStatus();
+  }, [refetchWhatsAppStatus]);
 
   const toggleBotStatus = async () => {
     try {
@@ -87,7 +80,7 @@ export default function Chatbot() {
       await api.post("/whatsapp/toggle", { enabled: newStatus });
       setIsBotEnabled(newStatus);
       toast.success(`Bot ${newStatus ? "ativado" : "desativado"} com sucesso`);
-      fetchWhatsAppStatus();
+      refetchWhatsAppStatus();
     } catch (error: any) {
       console.error("Error toggling bot:", error);
       toast.error("Erro ao alterar status do bot");
@@ -99,41 +92,34 @@ export default function Chatbot() {
       setIsConnecting(true);
       const response = await api.post("/whatsapp/connect");
 
-      // Atualizar o status com os dados da resposta
-      setWhatsappStatus({
-        id: "main",
-        status: "PAUSED",
-        qrCode: response.data.qrCode,
-        phoneNumber: whatsappStatus?.phoneNumber,
-        connectedAt: whatsappStatus?.connectedAt,
-      });
-
       toast.success("QR Code gerado com sucesso");
       setIsConnecting(false);
+
+      // Refetch do status para atualizar com o QR Code
+      refetchWhatsAppStatus();
 
       // Iniciar polling para verificar status da conexão
       const pollInterval = setInterval(async () => {
         try {
-          const statusResponse = await api.get("/whatsapp/status");
-          const newStatus = statusResponse.data;
-
-          setWhatsappStatus(newStatus);
-
+          const result = await refetchWhatsAppStatus();
+          const currentStatus = result.data;
+          
           // Se conectou, para o polling
-          if (newStatus.status === "CONNECTED") {
+          if (currentStatus?.status === "CONNECTED") {
             clearInterval(pollInterval);
             toast.success("WhatsApp conectado com sucesso!");
+            setIsConnecting(false);
           }
         } catch (error) {
           console.error("Erro ao verificar status:", error);
         }
       }, 2000); // Verificar a cada 2 segundos
 
-      // Parar polling após 30 segundos (timeout)
+      // Parar polling após 60 segundos (timeout)
       setTimeout(() => {
         clearInterval(pollInterval);
         setIsConnecting(false);
-      }, 30000);
+      }, 60000);
     } catch (error: any) {
       setIsConnecting(false);
       console.error("Error connecting WhatsApp:", error);
@@ -145,16 +131,10 @@ export default function Chatbot() {
     try {
       await api.post("/whatsapp/disconnect");
 
-      // Atualizar status imediatamente
-      setWhatsappStatus({
-        id: "main",
-        status: "DISCONNECTED",
-        phoneNumber: undefined,
-        qrCode: undefined,
-        connectedAt: undefined,
-      });
-
       toast.success("WhatsApp desconectado e sessão limpa");
+      
+      // Refetch do status para atualizar
+      refetchWhatsAppStatus();
     } catch (error: any) {
       console.error("Error disconnecting WhatsApp:", error);
       toast.error("Erro ao desconectar WhatsApp");
@@ -203,7 +183,10 @@ export default function Chatbot() {
   const getAppointmentsForDay = (day: Date) => {
     return appointments.filter((apt) => {
       const aptDate = new Date(apt.start);
-      return aptDate.toDateString() === day.toDateString();
+      // Normalizar ambas as datas para o mesmo timezone (local) antes de comparar
+      const aptDateNormalized = new Date(aptDate.getFullYear(), aptDate.getMonth(), aptDate.getDate());
+      const dayNormalized = new Date(day.getFullYear(), day.getMonth(), day.getDate());
+      return aptDateNormalized.getTime() === dayNormalized.getTime();
     });
   };
 
@@ -379,13 +362,23 @@ export default function Chatbot() {
                 {getWeekDays()[0].toLocaleDateString("pt-BR", {
                   day: "numeric",
                   month: "short",
+                  year: "numeric",
                 })}{" "}
                 -{" "}
                 {getWeekDays()[6].toLocaleDateString("pt-BR", {
                   day: "numeric",
                   month: "short",
+                  year: "numeric",
                 })}
               </span>
+              {currentWeekOffset !== 0 && (
+                <button
+                  onClick={() => setCurrentWeekOffset(0)}
+                  className="ml-2 px-2 py-1 text-xs bg-blue-500 text-white rounded hover:bg-blue-600 transition-colors"
+                >
+                  Hoje
+                </button>
+              )}
             </div>
           </div>
         </div>

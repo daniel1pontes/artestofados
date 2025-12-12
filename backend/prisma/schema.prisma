@@ -20,43 +20,8 @@ model User {
   lastEditedAppointments Appointment[] @relation("LastEditedBy")
   createdOS           OrderService[] @relation("OSCreatedBy")
   lastEditedOS        OrderService[] @relation("OSLastEditedBy")
-  createdSessions     Session[]      @relation("SessionCreatedBy")
-  createdMessages     Message[]      @relation("MessageCreatedBy")
 
   @@map("users")
-}
-
-model Session {
-  id        String   @id @default(cuid())
-  phoneNumber String  @unique
-  state     String   @default("initial")
-  metadata  Json?
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-  createdBy String
-
-  messages Message[]
-  createdByUser User @relation("SessionCreatedBy", fields: [createdBy], references: [id])
-
-  @@map("sessions")
-}
-
-model Message {
-  id          String   @id @default(cuid())
-  sessionId   String
-  fromNumber  String
-  body        String
-  timestamp   DateTime
-  messageType String   @default("text")
-  hasMedia    Boolean  @default(false)
-  mediaUrl    String?
-  createdAt   DateTime @default(now())
-  createdBy   String
-
-  session Session @relation(fields: [sessionId], references: [id], onDelete: Cascade)
-  createdByUser User @relation("MessageCreatedBy", fields: [createdBy], references: [id])
-
-  @@map("messages")
 }
 
 model Appointment {
@@ -204,6 +169,8 @@ model ConversationSession {
   state                 ConversationState @default(INTRO)
   context               Json?
   scheduledAppointmentId String?
+  pausedUntil           DateTime?         // Data/hora até quando o chatbot está pausado
+  pausedBy              String?           // Motivo da pausa (ex: "HUMAN_INTERVENTION")
   createdAt             DateTime          @default(now())
   updatedAt             DateTime          @updatedAt
 
