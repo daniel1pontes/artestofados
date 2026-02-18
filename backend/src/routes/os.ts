@@ -720,7 +720,8 @@ router.get(
       res.set({
         "Content-Type": image.mimetype,
         "Content-Length": buffer.length,
-        "Cache-Control": "public, max-age=31536000", // Cache por 1 ano
+        "Cache-Control": "public, max-age=3600",// Cache por 1h
+        "Vary": "Authorization"
       });
 
       res.send(buffer);
