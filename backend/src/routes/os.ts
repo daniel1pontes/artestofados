@@ -1,5 +1,5 @@
 import { Router, Response, NextFunction } from "express";
-import { PrismaClient } from "@prisma/client";
+import { prisma } from "../lib/prisma";
 import { authenticateToken } from "../middleware/auth";
 import { createError } from "../middleware/errorHandler";
 import fs from "fs";
@@ -7,6 +7,26 @@ import fsPromises from "fs/promises";
 import path from "path";
 import multer from "multer";
 import { generateOrderServicePDF } from "../services/pdfGenerator";
+
+// Garantir que o diretório de uploads exista
+const uploadsDir = path.join(process.cwd(), "uploads", "images");
+if (!fs.existsSync(uploadsDir)) {
+  fs.mkdirSync(uploadsDir, { recursive: true });
+}
+
+// Configure multer para disk storage
+const storage = multer.diskStorage({
+  destination: (req, file, cb) => {
+    cb(null, uploadsDir);
+  },
+  filename: (req, file, cb) => {
+    const uniqueSuffix = Date.now() + "-" + Math.round(Math.random() * 1e9);
+    cb(
+      null,
+      file.fieldname + "-" + uniqueSuffix + path.extname(file.originalname),
+    );
+  },
+});
 
 interface OrderItem {
   name: string;
@@ -16,10 +36,6 @@ interface OrderItem {
 }
 
 const router = Router();
-const prisma = new PrismaClient();
-
-// Configure multer for file uploads - usando memória para incorporação direta
-const storage = multer.memoryStorage();
 
 const upload = multer({
   storage: storage,
@@ -135,12 +151,12 @@ router.get("/", authenticateToken, async (req, res, next) => {
     // Combinar condições
     // Se ambas as condições existem, precisamos combiná-las com AND
     const where: any = {};
-    
-    if (Object.keys(searchConditions).length > 0 && Object.keys(delayConditions).length > 0) {
-      where.AND = [
-        searchConditions,
-        delayConditions,
-      ];
+
+    if (
+      Object.keys(searchConditions).length > 0 &&
+      Object.keys(delayConditions).length > 0
+    ) {
+      where.AND = [searchConditions, delayConditions];
     } else if (Object.keys(searchConditions).length > 0) {
       Object.assign(where, searchConditions);
     } else if (Object.keys(delayConditions).length > 0) {
@@ -152,7 +168,7 @@ router.get("/", authenticateToken, async (req, res, next) => {
     // Se o filtro "sem atraso" estiver ativo, ordenar por deliveryDeadline crescente (mais próximas primeiro)
     // Caso contrário, ordenar por createdAt (mais recentes primeiro)
     let orderBy: any = { createdAt: "desc" };
-    
+
     if (delayFilter === "no-delay") {
       // Para "sem atraso", ordenar por deliveryDeadline crescente (mais próximas do prazo primeiro)
       orderBy = { deliveryDeadline: "asc" };
@@ -164,11 +180,24 @@ router.get("/", authenticateToken, async (req, res, next) => {
     const [os, total] = await Promise.all([
       prisma.orderService.findMany({
         where,
-        include: {
+        select: {
+          id: true,
+          clientName: true,
+          clientPhone: true,
+          clientEmail: true,
+          clientAddress: true,
+          total: true,
+          status: true,
+          deliveryDeadline: true,
+          pdfPath: true,
+          createdAt: true,
+          discount: true,
+          paymentMethod: true,
           items: true,
           createdByUser: {
             select: { id: true, name: true, email: true },
           },
+          // REMOVIDO: images para evitar N+1 queries e Base64 na listagem
         },
         orderBy,
         skip,
@@ -177,31 +206,15 @@ router.get("/", authenticateToken, async (req, res, next) => {
       prisma.orderService.count({ where }),
     ]);
 
-    // Adicionar previews de imagens para cada OS
-    const osWithPreviews = await Promise.all(
-      os.map(async (order) => {
-        const osWithImages = await prisma.orderService.findUnique({
-          where: { id: order.id },
-          select: { images: true },
-        });
-
-        const imagesForPreview =
-          (osWithImages as any)?.images?.map((img: any) => ({
-            originalname: img.originalname,
-            mimetype: img.mimetype,
-            preview: `data:${img.mimetype};base64,${img.base64}`, // Data URL para preview
-            base64: img.base64, // Mantém para regeneração de PDF
-          })) || [];
-
-        return {
-          ...order,
-          images: imagesForPreview,
-        };
-      })
-    );
+    // Adicionar contagem de imagens para preview (sem carregar os dados)
+    const osWithImageCount = os.map((order) => ({
+      ...order,
+      imageCount: (order as any).images?.length || 0, // Contagem apenas para UI
+      hasImages: ((order as any).images?.length || 0) > 0,
+    }));
 
     res.json({
-      data: osWithPreviews,
+      data: osWithImageCount,
       pagination: {
         page: Number(page),
         limit: Number(limit),
@@ -223,6 +236,38 @@ router.get("/stats/count", authenticateToken, async (req, res, next) => {
     next(error);
   }
 });
+
+// Rota para obter metadados das imagens de uma OS (sem carregar Base64)
+router.get(
+  "/:id/images/metadata",
+  authenticateToken,
+  async (req, res, next) => {
+    try {
+      const { id } = req.params;
+
+      const os = await prisma.orderService.findUnique({
+        where: { id },
+        select: {
+          images: true, // Apenas os metadados, sem o Base64
+        },
+      });
+
+      if (!os) {
+        throw createError("Order service not found", 404);
+      }
+
+      const images = (os as any).images || [];
+      const imageMetadata = images.map((img: any) => ({
+        originalname: img.originalname,
+        mimetype: img.mimetype,
+      }));
+
+      res.json({ images: imageMetadata });
+    } catch (error) {
+      next(error);
+    }
+  },
+);
 
 router.get("/:id", authenticateToken, async (req, res, next) => {
   try {
@@ -354,25 +399,39 @@ router.post(
 
       console.log("✅ Itens validados:", itemsArray);
 
-      // Prepare image data - agora como buffers para incorporação direta
+      // Prepare image data - usando disk storage para economizar memória
       const imageData = Array.isArray(uploadedImages)
-        ? uploadedImages.map((file: any) => ({
-            buffer: file.buffer,
-            originalname: file.originalname,
-            mimetype: file.mimetype,
-            base64: file.buffer.toString("base64"), // Salva como Base64 para regeneração
-          }))
+        ? await Promise.all(
+            uploadedImages.map(async (file: any) => {
+              // Ler arquivo do disco para buffer apenas quando necessário
+              const fileBuffer = await fsPromises.readFile(file.path);
+              const base64 = fileBuffer.toString("base64");
+
+              // Manter estrutura compatível com PDF generator
+              const imageInfo = {
+                buffer: fileBuffer, // Buffer para PDF generation
+                originalname: file.originalname,
+                mimetype: file.mimetype,
+                filename: file.filename, // nome do arquivo no disco
+                path: file.path, // caminho no disco
+                base64, // Salva como Base64 para regeneração de PDF
+              };
+
+              return imageInfo;
+            }),
+          )
         : [];
 
-      console.log("📷 Imagens processadas como buffers:", imageData.length);
+      console.log("📷 Imagens processadas com disk storage:", imageData.length);
       console.log(
         "📷 Dados das imagens:",
         imageData.map((img) => ({
           originalname: img.originalname,
           mimetype: img.mimetype,
+          filename: img.filename,
           bufferSize: img.buffer.length,
           hasBase64: !!img.base64,
-        }))
+        })),
       );
 
       // Create OS in database
@@ -412,7 +471,7 @@ router.post(
       // Calculate subtotal (soma dos totais dos itens)
       const subtotal = itemsArray.reduce(
         (sum: number, item: any) => sum + parseFloat(item.total),
-        0
+        0,
       );
 
       // Apply general discount (percentage) to calculate final total
@@ -500,7 +559,7 @@ router.post(
     } catch (error) {
       next(error);
     }
-  }
+  },
 );
 
 router.put("/:id", authenticateToken, async (req, res, next) => {
@@ -548,10 +607,11 @@ router.put("/:id", authenticateToken, async (req, res, next) => {
         const unitVal = parseFloat(item.unitValue.toString());
         const itemDiscount = parseFloat((item as any).discount || 0);
         const itemSubtotal = qty * unitVal;
-        const itemTotal = itemDiscount > 0 
-          ? itemSubtotal * (1 - itemDiscount / 100)
-          : itemSubtotal;
-        
+        const itemTotal =
+          itemDiscount > 0
+            ? itemSubtotal * (1 - itemDiscount / 100)
+            : itemSubtotal;
+
         return {
           ...item,
           total: itemTotal,
@@ -575,11 +635,12 @@ router.put("/:id", authenticateToken, async (req, res, next) => {
 
     subtotal = processedItems.reduce(
       (sum: number, item: OrderItem) => sum + item.total,
-      0
+      0,
     );
-    
+
     // Apply general discount (percentage) to calculate final total
-    const discountPercent = discount !== undefined ? parseFloat(discount) : (existingOS.discount || 0);
+    const discountPercent =
+      discount !== undefined ? parseFloat(discount) : existingOS.discount || 0;
     const total = Math.max(0, subtotal * (1 - discountPercent / 100));
 
     let pdfPath = existingOS.pdfPath;
@@ -606,7 +667,7 @@ router.put("/:id", authenticateToken, async (req, res, next) => {
           deliveryDeadline:
             deliveryDeadline || (existingOS as any).deliveryDeadline
               ? new Date(
-                  deliveryDeadline || (existingOS as any).deliveryDeadline
+                  deliveryDeadline || (existingOS as any).deliveryDeadline,
                 )
                   .toISOString()
                   .split("T")[0]
@@ -649,12 +710,16 @@ router.put("/:id", authenticateToken, async (req, res, next) => {
       data: {
         clientName: clientName || existingOS.clientName,
         clientPhone: clientPhone || existingOS.clientPhone,
-        clientAddress: clientAddress !== undefined ? clientAddress : existingOS.clientAddress,
+        clientAddress:
+          clientAddress !== undefined
+            ? clientAddress
+            : existingOS.clientAddress,
         deliveryDeadline: deliveryDeadline
           ? new Date(deliveryDeadline)
           : (existingOS as any).deliveryDeadline,
         paymentMethod: paymentMethod || existingOS.paymentMethod,
-        discount: discount !== undefined ? parseFloat(discount) : existingOS.discount,
+        discount:
+          discount !== undefined ? parseFloat(discount) : existingOS.discount,
         total,
         status: status || existingOS.status,
         pdfPath: pdfPath || existingOS.pdfPath,
@@ -720,15 +785,15 @@ router.get(
       res.set({
         "Content-Type": image.mimetype,
         "Content-Length": buffer.length,
-        "Cache-Control": "public, max-age=3600",// Cache por 1h
-        "Vary": "Authorization"
+        "Cache-Control": "public, max-age=3600", // Cache por 1h
+        Vary: "Authorization",
       });
 
       res.send(buffer);
     } catch (error) {
       next(error);
     }
-  }
+  },
 );
 
 router.delete("/:id", authenticateToken, async (req, res, next) => {

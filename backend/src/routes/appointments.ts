@@ -1,5 +1,5 @@
 import { Router } from "express";
-import { PrismaClient } from "@prisma/client";
+import { prisma } from "../lib/prisma";
 import { authenticateToken } from "../middleware/auth";
 import { createError } from "../middleware/errorHandler";
 import AppointmentService from "../services/AppointmentService";
@@ -8,7 +8,6 @@ import { config } from "../config/environment";
 import { z } from "zod";
 
 const router = Router();
-const prisma = new PrismaClient();
 const appointmentService = new AppointmentService();
 const googleCalendarService = new GoogleCalendarService();
 
@@ -39,7 +38,7 @@ router.get("/", authenticateToken, async (req, res, next) => {
     if (start && end) {
       const startDate = new Date(start as string);
       const endDate = new Date(end as string);
-      
+
       // Lógica correta de sobreposição: um agendamento se sobrepõe se:
       // - começa antes ou no fim do intervalo E
       // - termina depois ou no início do intervalo
@@ -111,7 +110,7 @@ router.post("/", authenticateToken, async (req, res, next) => {
     // Parse date and time
     const startDateTime = appointmentService.parseDateTime(
       validatedData.date,
-      validatedData.time
+      validatedData.time,
     );
 
     if (!startDateTime) {
@@ -125,7 +124,7 @@ router.post("/", authenticateToken, async (req, res, next) => {
     const validation = await appointmentService.validateAppointment(
       startDateTime,
       endDateTime,
-      validatedData.type
+      validatedData.type,
     );
 
     if (!validation.isValid) {
@@ -217,12 +216,13 @@ router.put("/:id/reschedule", authenticateToken, async (req, res, next) => {
     const endDateTime = new Date(startDateTime);
     endDateTime.setHours(endDateTime.getHours() + 1);
 
-    const rescheduledAppointment = await appointmentService.rescheduleAppointment(
-      id,
-      startDateTime,
-      endDateTime,
-      userId
-    );
+    const rescheduledAppointment =
+      await appointmentService.rescheduleAppointment(
+        id,
+        startDateTime,
+        endDateTime,
+        userId,
+      );
 
     res.json({
       success: true,
@@ -242,7 +242,7 @@ router.post("/:id/cancel", authenticateToken, async (req, res, next) => {
 
     const cancelledAppointment = await appointmentService.cancelAppointment(
       id,
-      userId
+      userId,
     );
 
     res.json({
@@ -277,9 +277,9 @@ router.delete("/:id", authenticateToken, async (req, res, next) => {
       where: { id },
     });
 
-    res.json({ 
+    res.json({
       success: true,
-      message: "Agendamento deletado permanentemente" 
+      message: "Agendamento deletado permanentemente",
     });
   } catch (error) {
     next(error);
@@ -311,7 +311,7 @@ router.get("/availability/:date", authenticateToken, async (req, res, next) => {
 
     const availableSlots = await appointmentService.getAvailableSlots(
       targetDate,
-      type as "ONLINE" | "IN_STORE"
+      type as "ONLINE" | "IN_STORE",
     );
 
     res.json({
@@ -346,7 +346,7 @@ router.post("/validate", authenticateToken, async (req, res, next) => {
     const validation = await appointmentService.validateAppointment(
       startDateTime,
       endDateTime,
-      type as "ONLINE" | "IN_STORE"
+      type as "ONLINE" | "IN_STORE",
     );
 
     res.json({
@@ -378,7 +378,7 @@ router.post(
 
       const isAvailable = await googleCalendarService.checkAvailability(
         startDate,
-        endDate
+        endDate,
       );
 
       res.json({
@@ -390,7 +390,7 @@ router.post(
     } catch (error) {
       next(error);
     }
-  }
+  },
 );
 
 // Sincronizar agendamento com Google Calendar
@@ -467,12 +467,12 @@ router.delete(
       if (!appointment.gcalEventId) {
         throw createError(
           "Agendamento não possui evento no Google Calendar",
-          400
+          400,
         );
       }
 
       const deleted = await googleCalendarService.deleteAppointment(
-        appointment.gcalEventId
+        appointment.gcalEventId,
       );
 
       if (deleted) {
@@ -497,7 +497,7 @@ router.delete(
     } catch (error) {
       next(error);
     }
-  }
+  },
 );
 
 export default router;

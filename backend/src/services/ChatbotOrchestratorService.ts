@@ -1,11 +1,15 @@
-import { PrismaClient, ConversationState } from "@prisma/client";
-import { NaturalLanguageEngine, IntentType, SlotData } from "../modules/chatbot/NaturalLanguageEngine";
+import { ConversationState } from "@prisma/client";
+import { prisma } from "../lib/prisma";
+import {
+  NaturalLanguageEngine,
+  IntentType,
+  SlotData,
+} from "../modules/chatbot/NaturalLanguageEngine";
 import { ConversationRepository } from "../modules/chatbot/ConversationRepository";
 import AppointmentService from "./AppointmentService";
 import { DateTimeParser } from "../utils/DateTimeParser";
 import { createLogger } from "../utils/logger";
 
-const prisma = new PrismaClient();
 const logger = createLogger("ChatbotOrchestratorService");
 
 interface ChatbotResponse {
@@ -29,12 +33,17 @@ class ChatbotOrchestratorService {
   /**
    * Processa mensagem do usuário e retorna resposta com possível criação de agendamento
    */
-  async processMessage(phoneNumber: string, userMessage: string): Promise<ChatbotResponse> {
+  async processMessage(
+    phoneNumber: string,
+    userMessage: string,
+  ): Promise<ChatbotResponse> {
     try {
       // Verificar se a conversa está pausada ANTES de processar
-      const isPaused = await this.conversationRepo.isConversationPaused(phoneNumber);
+      const isPaused =
+        await this.conversationRepo.isConversationPaused(phoneNumber);
       if (isPaused) {
-        const remainingMinutes = await this.conversationRepo.getPauseTimeRemaining(phoneNumber);
+        const remainingMinutes =
+          await this.conversationRepo.getPauseTimeRemaining(phoneNumber);
         logger.info("Mensagem ignorada - conversa pausada", {
           phoneNumber,
           remainingMinutes,
@@ -44,16 +53,20 @@ class ChatbotOrchestratorService {
       }
 
       // Buscar ou criar sessão de conversa
-      const session = await this.conversationRepo.findOrCreateByPhone(phoneNumber);
+      const session =
+        await this.conversationRepo.findOrCreateByPhone(phoneNumber);
 
       // Interpretar mensagem usando NLP
-      const interpretation = await this.nlpEngine.interpret(session, userMessage);
+      const interpretation = await this.nlpEngine.interpret(
+        session,
+        userMessage,
+      );
 
       // Salvar mensagem do usuário
       await this.conversationRepo.appendMessage(
         session.id,
         "USER",
-        userMessage
+        userMessage,
       );
 
       // Processar baseado no intent
@@ -64,7 +77,7 @@ class ChatbotOrchestratorService {
           response = await this.handleConfirmAppointment(
             session,
             interpretation.slots,
-            interpretation.reply
+            interpretation.reply,
           );
           break;
 
@@ -72,7 +85,7 @@ class ChatbotOrchestratorService {
           response = await this.handleScheduleAppointment(
             session,
             interpretation.slots,
-            interpretation.reply
+            interpretation.reply,
           );
           break;
 
@@ -80,7 +93,7 @@ class ChatbotOrchestratorService {
           response = await this.handleCancelAppointment(
             session,
             interpretation.slots,
-            interpretation.reply
+            interpretation.reply,
           );
           break;
 
@@ -88,7 +101,7 @@ class ChatbotOrchestratorService {
           response = await this.handleRescheduleAppointment(
             session,
             interpretation.slots,
-            interpretation.reply
+            interpretation.reply,
           );
           break;
 
@@ -107,7 +120,7 @@ class ChatbotOrchestratorService {
       await this.conversationRepo.appendMessage(
         session.id,
         "BOT",
-        response.message
+        response.message,
       );
 
       // Atualizar estado da sessão se necessário
@@ -115,13 +128,18 @@ class ChatbotOrchestratorService {
 
       return response;
     } catch (error) {
-      logger.error("Erro ao processar mensagem", error instanceof Error ? error : new Error(String(error)), {
-        phoneNumber,
-        message: userMessage.substring(0, 100),
-      });
+      logger.error(
+        "Erro ao processar mensagem",
+        error instanceof Error ? error : new Error(String(error)),
+        {
+          phoneNumber,
+          message: userMessage.substring(0, 100),
+        },
+      );
 
       return {
-        message: "Desculpe, ocorreu um erro ao processar sua mensagem. Tente novamente.",
+        message:
+          "Desculpe, ocorreu um erro ao processar sua mensagem. Tente novamente.",
         intent: "SMALL_TALK",
       };
     }
@@ -133,10 +151,10 @@ class ChatbotOrchestratorService {
   private async handleConfirmAppointment(
     session: any,
     slots: SlotData,
-    defaultReply: string
+    defaultReply: string,
   ): Promise<ChatbotResponse> {
     // Verificar se temos todos os dados necessários
-    const hasAllData = 
+    const hasAllData =
       slots.clientName &&
       slots.appointmentType &&
       slots.appointmentDate &&
@@ -154,12 +172,13 @@ class ChatbotOrchestratorService {
       // Parse de data e horário
       const startDateTime = this.parseAppointmentDateTime(
         slots.appointmentDate!,
-        slots.appointmentTime!
+        slots.appointmentTime!,
       );
 
       if (!startDateTime) {
         return {
-          message: "Desculpe, não consegui entender a data ou horário. Pode informar novamente?",
+          message:
+            "Desculpe, não consegui entender a data ou horário. Pode informar novamente?",
           intent: "COLLECT_DATA",
         };
       }
@@ -177,15 +196,18 @@ class ChatbotOrchestratorService {
       const endDateTime = new Date(startDateTime);
       endDateTime.setHours(endDateTime.getHours() + 1);
 
-      const availabilityValidation = await this.appointmentService.validateAppointment(
-        startDateTime,
-        endDateTime,
-        slots.appointmentType as "ONLINE" | "IN_STORE"
-      );
+      const availabilityValidation =
+        await this.appointmentService.validateAppointment(
+          startDateTime,
+          endDateTime,
+          slots.appointmentType as "ONLINE" | "IN_STORE",
+        );
 
       if (!availabilityValidation.isValid) {
         return {
-          message: availabilityValidation.message || "Desculpe, este horário não está disponível. Pode escolher outro?",
+          message:
+            availabilityValidation.message ||
+            "Desculpe, este horário não está disponível. Pode escolher outro?",
           intent: "SCHEDULE_APPOINTMENT",
         };
       }
@@ -194,9 +216,12 @@ class ChatbotOrchestratorService {
       const systemUser = await this.getSystemUserId();
 
       if (!systemUser) {
-        logger.error("Não foi possível encontrar usuário do sistema para criar agendamento");
+        logger.error(
+          "Não foi possível encontrar usuário do sistema para criar agendamento",
+        );
         return {
-          message: "Desculpe, ocorreu um erro interno. Tente novamente mais tarde.",
+          message:
+            "Desculpe, ocorreu um erro interno. Tente novamente mais tarde.",
           intent: "SMALL_TALK",
         };
       }
@@ -214,7 +239,8 @@ class ChatbotOrchestratorService {
       if (!appointment) {
         logger.error("Falha ao criar agendamento - retornou null");
         return {
-          message: "Desculpe, ocorreu um erro ao criar seu agendamento. Tente novamente.",
+          message:
+            "Desculpe, ocorreu um erro ao criar seu agendamento. Tente novamente.",
           intent: "SCHEDULE_APPOINTMENT",
         };
       }
@@ -225,7 +251,8 @@ class ChatbotOrchestratorService {
         state: ConversationState.COMPLETED,
       });
 
-      const typeText = slots.appointmentType === "ONLINE" ? "online" : "na loja";
+      const typeText =
+        slots.appointmentType === "ONLINE" ? "online" : "na loja";
       const formattedDate = startDateTime.toLocaleDateString("pt-BR", {
         weekday: "long",
         day: "numeric",
@@ -237,12 +264,12 @@ class ChatbotOrchestratorService {
         minute: "2-digit",
       });
 
-      const confirmationMessage = 
+      const confirmationMessage =
         `✅ Agendamento confirmado!\n\n` +
         `📅 Data: ${formattedDate}\n` +
         `🕐 Horário: ${formattedTime}\n` +
         `📍 Tipo: ${typeText}\n\n` +
-        (slots.appointmentType === "ONLINE" 
+        (slots.appointmentType === "ONLINE"
           ? `🔗 Você receberá o link da reunião em breve.\n\n`
           : `📍 Endereço: Av. Almirante Barroso, 389, Centro – João Pessoa – PB\n\n`) +
         `Até breve! 😊`;
@@ -262,30 +289,44 @@ class ChatbotOrchestratorService {
         appointmentId: appointment.id,
       };
     } catch (error) {
-      logger.error("Erro ao criar agendamento", error instanceof Error ? error : new Error(String(error)), {
-        sessionId: session.id,
-        slots,
-      });
+      logger.error(
+        "Erro ao criar agendamento",
+        error instanceof Error ? error : new Error(String(error)),
+        {
+          sessionId: session.id,
+          slots,
+        },
+      );
 
       // Tratar erros específicos
-      const errorMessage = error instanceof Error ? error.message : String(error);
-      
-      if (errorMessage.includes("não disponível") || errorMessage.includes("horário")) {
+      const errorMessage =
+        error instanceof Error ? error.message : String(error);
+
+      if (
+        errorMessage.includes("não disponível") ||
+        errorMessage.includes("horário")
+      ) {
         return {
-          message: "Desculpe, este horário não está mais disponível. Pode escolher outro?",
+          message:
+            "Desculpe, este horário não está mais disponível. Pode escolher outro?",
           intent: "SCHEDULE_APPOINTMENT",
         };
       }
 
-      if (errorMessage.includes("passada") || errorMessage.includes("passado")) {
+      if (
+        errorMessage.includes("passada") ||
+        errorMessage.includes("passado")
+      ) {
         return {
-          message: "Não é possível agendar para uma data/hora passada. Pode escolher outro horário?",
+          message:
+            "Não é possível agendar para uma data/hora passada. Pode escolher outro horário?",
           intent: "SCHEDULE_APPOINTMENT",
         };
       }
 
       return {
-        message: "Desculpe, ocorreu um erro ao criar seu agendamento. Pode tentar novamente?",
+        message:
+          "Desculpe, ocorreu um erro ao criar seu agendamento. Pode tentar novamente?",
         intent: "SCHEDULE_APPOINTMENT",
       };
     }
@@ -297,7 +338,7 @@ class ChatbotOrchestratorService {
   private async handleScheduleAppointment(
     session: any,
     slots: SlotData,
-    defaultReply: string
+    defaultReply: string,
   ): Promise<ChatbotResponse> {
     // Atualizar contexto da sessão com slots coletados
     await this.updateSessionContext(session.id, slots);
@@ -314,17 +355,19 @@ class ChatbotOrchestratorService {
   private async handleCancelAppointment(
     session: any,
     slots: SlotData,
-    defaultReply: string
+    defaultReply: string,
   ): Promise<ChatbotResponse> {
     try {
       // Buscar agendamento ativo do cliente
-      const appointment = await this.appointmentService.findActiveAppointmentByPhone(
-        session.phoneNumber
-      );
+      const appointment =
+        await this.appointmentService.findActiveAppointmentByPhone(
+          session.phoneNumber,
+        );
 
       if (!appointment) {
         return {
-          message: "Não encontrei nenhum agendamento ativo em seu nome. Posso ajudar com algo mais?",
+          message:
+            "Não encontrei nenhum agendamento ativo em seu nome. Posso ajudar com algo mais?",
           intent: "CANCEL_APPOINTMENT",
         };
       }
@@ -344,7 +387,7 @@ class ChatbotOrchestratorService {
         const typeText = appointment.type === "ONLINE" ? "online" : "na loja";
 
         return {
-          message: 
+          message:
             `Encontrei seu agendamento:\n\n` +
             `📅 Data: ${formattedDate}\n` +
             `🕐 Horário: ${formattedTime}\n` +
@@ -357,15 +400,21 @@ class ChatbotOrchestratorService {
       // Obter userId do sistema
       const systemUser = await this.getSystemUserId();
       if (!systemUser) {
-        logger.error("Não foi possível encontrar usuário do sistema para cancelar agendamento");
+        logger.error(
+          "Não foi possível encontrar usuário do sistema para cancelar agendamento",
+        );
         return {
-          message: "Desculpe, ocorreu um erro interno. Tente novamente mais tarde.",
+          message:
+            "Desculpe, ocorreu um erro interno. Tente novamente mais tarde.",
           intent: "SMALL_TALK",
         };
       }
 
       // Cancelar agendamento
-      await this.appointmentService.cancelAppointment(appointment.id, systemUser.id);
+      await this.appointmentService.cancelAppointment(
+        appointment.id,
+        systemUser.id,
+      );
 
       logger.info("Agendamento cancelado via chatbot", {
         appointmentId: appointment.id,
@@ -386,12 +435,17 @@ class ChatbotOrchestratorService {
         intent: "CANCEL_APPOINTMENT",
       };
     } catch (error) {
-      logger.error("Erro ao cancelar agendamento", error instanceof Error ? error : new Error(String(error)), {
-        sessionId: session.id,
-      });
+      logger.error(
+        "Erro ao cancelar agendamento",
+        error instanceof Error ? error : new Error(String(error)),
+        {
+          sessionId: session.id,
+        },
+      );
 
       return {
-        message: "Desculpe, ocorreu um erro ao cancelar seu agendamento. Tente novamente.",
+        message:
+          "Desculpe, ocorreu um erro ao cancelar seu agendamento. Tente novamente.",
         intent: "CANCEL_APPOINTMENT",
       };
     }
@@ -403,17 +457,19 @@ class ChatbotOrchestratorService {
   private async handleRescheduleAppointment(
     session: any,
     slots: SlotData,
-    defaultReply: string
+    defaultReply: string,
   ): Promise<ChatbotResponse> {
     try {
       // Buscar agendamento ativo do cliente
-      const appointment = await this.appointmentService.findActiveAppointmentByPhone(
-        session.phoneNumber
-      );
+      const appointment =
+        await this.appointmentService.findActiveAppointmentByPhone(
+          session.phoneNumber,
+        );
 
       if (!appointment) {
         return {
-          message: "Não encontrei nenhum agendamento ativo em seu nome. Posso ajudar com algo mais?",
+          message:
+            "Não encontrei nenhum agendamento ativo em seu nome. Posso ajudar com algo mais?",
           intent: "RESCHEDULE_APPOINTMENT",
         };
       }
@@ -448,18 +504,20 @@ class ChatbotOrchestratorService {
       // Parse de nova data e horário
       const newStartDateTime = this.parseAppointmentDateTime(
         slots.appointmentDate!,
-        slots.appointmentTime!
+        slots.appointmentTime!,
       );
 
       if (!newStartDateTime) {
         return {
-          message: "Desculpe, não consegui entender a data ou horário. Pode informar novamente?",
+          message:
+            "Desculpe, não consegui entender a data ou horário. Pode informar novamente?",
           intent: "RESCHEDULE_APPOINTMENT",
         };
       }
 
       // Validar horário
-      const validation = DateTimeParser.validateAppointmentSlot(newStartDateTime);
+      const validation =
+        DateTimeParser.validateAppointmentSlot(newStartDateTime);
       if (!validation.isValid) {
         return {
           message: validation.message,
@@ -471,15 +529,18 @@ class ChatbotOrchestratorService {
       const newEndDateTime = new Date(newStartDateTime);
       newEndDateTime.setHours(newEndDateTime.getHours() + 1);
 
-      const availabilityValidation = await this.appointmentService.validateAppointment(
-        newStartDateTime,
-        newEndDateTime,
-        appointment.type
-      );
+      const availabilityValidation =
+        await this.appointmentService.validateAppointment(
+          newStartDateTime,
+          newEndDateTime,
+          appointment.type,
+        );
 
       if (!availabilityValidation.isValid) {
         return {
-          message: availabilityValidation.message || "Desculpe, este horário não está disponível. Pode escolher outro?",
+          message:
+            availabilityValidation.message ||
+            "Desculpe, este horário não está disponível. Pode escolher outro?",
           intent: "RESCHEDULE_APPOINTMENT",
         };
       }
@@ -510,20 +571,24 @@ class ChatbotOrchestratorService {
       // Obter userId do sistema
       const systemUser = await this.getSystemUserId();
       if (!systemUser) {
-        logger.error("Não foi possível encontrar usuário do sistema para reagendar");
+        logger.error(
+          "Não foi possível encontrar usuário do sistema para reagendar",
+        );
         return {
-          message: "Desculpe, ocorreu um erro interno. Tente novamente mais tarde.",
+          message:
+            "Desculpe, ocorreu um erro interno. Tente novamente mais tarde.",
           intent: "SMALL_TALK",
         };
       }
 
       // Reagendar (exclui agendamento antigo e cria um novo)
-      const newAppointment = await this.appointmentService.rescheduleAppointment(
-        appointment.id,
-        newStartDateTime,
-        newEndDateTime,
-        systemUser.id
-      );
+      const newAppointment =
+        await this.appointmentService.rescheduleAppointment(
+          appointment.id,
+          newStartDateTime,
+          newEndDateTime,
+          systemUser.id,
+        );
 
       if (!newAppointment) {
         logger.error("Falha ao reagendar - retornou null");
@@ -566,36 +631,50 @@ class ChatbotOrchestratorService {
           `📅 Nova data: ${formattedDate}\n` +
           `🕐 Novo horário: ${formattedTime}\n` +
           `📍 Tipo: ${typeText}\n\n` +
-          (appointment.type === "ONLINE" 
+          (appointment.type === "ONLINE"
             ? `🔗 Você receberá o novo link da reunião em breve.\n\n`
             : `📍 Endereço: Av. Almirante Barroso, 389, Centro – João Pessoa – PB\n\n`) +
           `Até breve! 😊`,
         intent: "RESCHEDULE_APPOINTMENT",
       };
     } catch (error) {
-      logger.error("Erro ao reagendar", error instanceof Error ? error : new Error(String(error)), {
-        sessionId: session.id,
-        slots,
-      });
+      logger.error(
+        "Erro ao reagendar",
+        error instanceof Error ? error : new Error(String(error)),
+        {
+          sessionId: session.id,
+          slots,
+        },
+      );
 
-      const errorMessage = error instanceof Error ? error.message : String(error);
-      
-      if (errorMessage.includes("não disponível") || errorMessage.includes("horário")) {
+      const errorMessage =
+        error instanceof Error ? error.message : String(error);
+
+      if (
+        errorMessage.includes("não disponível") ||
+        errorMessage.includes("horário")
+      ) {
         return {
-          message: "Desculpe, este horário não está mais disponível. Pode escolher outro?",
+          message:
+            "Desculpe, este horário não está mais disponível. Pode escolher outro?",
           intent: "RESCHEDULE_APPOINTMENT",
         };
       }
 
-      if (errorMessage.includes("passada") || errorMessage.includes("passado")) {
+      if (
+        errorMessage.includes("passada") ||
+        errorMessage.includes("passado")
+      ) {
         return {
-          message: "Não é possível agendar para uma data/hora passada. Pode escolher outro horário?",
+          message:
+            "Não é possível agendar para uma data/hora passada. Pode escolher outro horário?",
           intent: "RESCHEDULE_APPOINTMENT",
         };
       }
 
       return {
-        message: "Desculpe, ocorreu um erro ao reagendar. Pode tentar novamente?",
+        message:
+          "Desculpe, ocorreu um erro ao reagendar. Pode tentar novamente?",
         intent: "RESCHEDULE_APPOINTMENT",
       };
     }
@@ -604,7 +683,10 @@ class ChatbotOrchestratorService {
   /**
    * Lida com cancelamento da conversa (não do agendamento)
    */
-  private async handleCancel(session: any, defaultReply: string): Promise<ChatbotResponse> {
+  private async handleCancel(
+    session: any,
+    defaultReply: string,
+  ): Promise<ChatbotResponse> {
     await this.conversationRepo.updateSession(session.id, {
       state: ConversationState.INTRO,
     });
@@ -618,12 +700,22 @@ class ChatbotOrchestratorService {
   /**
    * Parse de data e horário do agendamento
    */
-  private parseAppointmentDateTime(dateStr: string, timeStr: string): Date | null {
+  private parseAppointmentDateTime(
+    dateStr: string,
+    timeStr: string,
+  ): Date | null {
     // Tenta parse combinado primeiro (ex: "amanhã 12h")
-    const combined = DateTimeParser.parseCombinedDateTime(`${dateStr} ${timeStr}`);
+    const combined = DateTimeParser.parseCombinedDateTime(
+      `${dateStr} ${timeStr}`,
+    );
     if (combined && combined.date && combined.time) {
       const result = new Date(combined.date);
-      result.setHours(combined.time.getHours(), combined.time.getMinutes(), 0, 0);
+      result.setHours(
+        combined.time.getHours(),
+        combined.time.getMinutes(),
+        0,
+        0,
+      );
       return result;
     }
 
@@ -634,13 +726,19 @@ class ChatbotOrchestratorService {
   /**
    * Atualiza estado da sessão baseado na interpretação
    */
-  private async updateSessionState(sessionId: string, interpretation: any): Promise<void> {
+  private async updateSessionState(
+    sessionId: string,
+    interpretation: any,
+  ): Promise<void> {
     const updates: any = {};
 
     // Atualizar estado baseado no intent
     switch (interpretation.intent) {
       case "SCHEDULE_APPOINTMENT":
-        if (interpretation.slots.appointmentDate && interpretation.slots.appointmentTime) {
+        if (
+          interpretation.slots.appointmentDate &&
+          interpretation.slots.appointmentTime
+        ) {
           updates.state = ConversationState.CONFIRMING;
         } else if (interpretation.slots.appointmentType) {
           updates.state = ConversationState.ASKING_DATE;
@@ -675,7 +773,10 @@ class ChatbotOrchestratorService {
   /**
    * Atualiza contexto da sessão com slots coletados
    */
-  private async updateSessionContext(sessionId: string, slots: SlotData): Promise<void> {
+  private async updateSessionContext(
+    sessionId: string,
+    slots: SlotData,
+  ): Promise<void> {
     const session = await prisma.conversationSession.findUnique({
       where: { id: sessionId },
     });
@@ -715,7 +816,10 @@ class ChatbotOrchestratorService {
 
       return anyUser;
     } catch (error) {
-      logger.error("Erro ao buscar usuário do sistema", error instanceof Error ? error : new Error(String(error)));
+      logger.error(
+        "Erro ao buscar usuário do sistema",
+        error instanceof Error ? error : new Error(String(error)),
+      );
       return null;
     }
   }
@@ -730,7 +834,10 @@ class ChatbotOrchestratorService {
   /**
    * Pausa uma conversa por X horas
    */
-  async pauseConversation(phoneNumber: string, hours: number = 2): Promise<void> {
+  async pauseConversation(
+    phoneNumber: string,
+    hours: number = 2,
+  ): Promise<void> {
     await this.conversationRepo.pauseConversation(phoneNumber, hours);
     logger.info("Conversa pausada", {
       phoneNumber,
@@ -764,4 +871,3 @@ class ChatbotOrchestratorService {
 }
 
 export default ChatbotOrchestratorService;
-

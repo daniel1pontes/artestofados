@@ -33,19 +33,12 @@ declare global {
 
 export function validateConfig() {
   try {
-    // #region agent log
-    fetch('http://127.0.0.1:7242/ingest/0706edf3-73bf-4965-a41a-e0e48bfe722c',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'environment.ts:33',message:'validateConfig entry',data:{rawDatabaseUrl:process.env.DATABASE_URL},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A'})}).catch(()=>{});
-    // #endregion
     // Valida as variáveis de ambiente
     const envVars = envSchema.parse(process.env);
 
     // Extrair nome do banco da DATABASE_URL
     const dbNameMatch = envVars.DATABASE_URL.match(/\/([^/?]+)(\?|$)/);
-    const dbName = dbNameMatch ? dbNameMatch[1] : 'unknown';
-    
-    // #region agent log
-    fetch('http://127.0.0.1:7242/ingest/0706edf3-73bf-4965-a41a-e0e48bfe722c',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'environment.ts:42',message:'DATABASE_URL parsed',data:{databaseUrl:envVars.DATABASE_URL,extractedDbName:dbName},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A'})}).catch(()=>{});
-    // #endregion
+    const dbName = dbNameMatch ? dbNameMatch[1] : "unknown";
 
     // Retorna as variáveis de ambiente validadas
     return {

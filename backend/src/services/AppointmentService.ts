@@ -1,8 +1,5 @@
-import {
-  PrismaClient,
-  AppointmentType,
-  Appointment,
-} from "@prisma/client";
+import { PrismaClient, AppointmentType, Appointment } from "@prisma/client";
+import { prisma } from "../lib/prisma";
 import { addHours, format, isBefore, startOfDay } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import GoogleCalendarService, {
@@ -11,8 +8,6 @@ import GoogleCalendarService, {
 import { DateTimeParser } from "../utils/DateTimeParser";
 import { createLogger } from "../utils/logger";
 import { config } from "../config/environment";
-
-const prisma = new PrismaClient();
 
 interface CreateAppointmentData {
   clientName: string;
@@ -41,7 +36,7 @@ class AppointmentService {
     const availability = await this.validateAppointment(
       data.start,
       data.end,
-      data.type
+      data.type,
     );
 
     if (!availability.isValid) {
@@ -76,7 +71,7 @@ class AppointmentService {
           clientName: appointment.clientName,
           start: appointment.start,
           end: appointment.end,
-        }
+        },
       );
       // Não lançamos o erro para não impedir a criação do agendamento
       // mas logamos para diagnóstico
@@ -95,7 +90,7 @@ class AppointmentService {
   async validateAppointment(
     start: Date,
     end: Date,
-    type: AppointmentType
+    type: AppointmentType,
   ): Promise<ValidationResult> {
     try {
       this.ensureBusinessRules(start, end);
@@ -124,7 +119,7 @@ class AppointmentService {
   async checkAvailability(
     start: Date,
     end: Date,
-    type: AppointmentType
+    type: AppointmentType,
   ): Promise<boolean> {
     const conflicts = await prisma.appointment.count({
       where: {
@@ -147,7 +142,7 @@ class AppointmentService {
 
   async getAvailableSlots(
     date: Date,
-    type: AppointmentType
+    type: AppointmentType,
   ): Promise<string[]> {
     const slots: string[] = [];
     const targetDate = startOfDay(date);
@@ -169,11 +164,7 @@ class AppointmentService {
         continue;
       }
 
-      const available = await this.checkAvailability(
-        slotStart,
-        slotEnd,
-        type
-      );
+      const available = await this.checkAvailability(slotStart, slotEnd, type);
 
       if (available) {
         slots.push(format(slotStart, "HH:mm", { locale: ptBR }));
@@ -206,13 +197,13 @@ class AppointmentService {
   private ensureBusinessRules(start: Date, end: Date) {
     if (!this.isWeekday(start)) {
       throw new Error(
-        "Atendimentos disponíveis apenas de segunda a sexta-feira."
+        "Atendimentos disponíveis apenas de segunda a sexta-feira.",
       );
     }
 
     if (!this.isBusinessHours(start) || !this.isBusinessHours(end)) {
       throw new Error(
-        `Horário de atendimento: ${this.BUSINESS_START_HOUR}h às ${this.BUSINESS_END_HOUR}h.`
+        `Horário de atendimento: ${this.BUSINESS_START_HOUR}h às ${this.BUSINESS_END_HOUR}h.`,
       );
     }
 
@@ -261,7 +252,7 @@ class AppointmentService {
           {
             appointmentId: appointment.id,
             gcalEventId: appointment.gcalEventId,
-          }
+          },
         );
         // Continua mesmo se falhar a remoção do Calendar
       }
@@ -294,7 +285,7 @@ class AppointmentService {
     appointmentId: string,
     newStart: Date,
     newEnd: Date,
-    userId: string
+    userId: string,
   ) {
     const oldAppointment = await prisma.appointment.findUnique({
       where: { id: appointmentId },
@@ -314,7 +305,7 @@ class AppointmentService {
     const availability = await this.validateAppointment(
       newStart,
       newEnd,
-      oldAppointment.type
+      oldAppointment.type,
     );
 
     if (!availability.isValid) {
@@ -336,7 +327,7 @@ class AppointmentService {
           {
             appointmentId: oldAppointment.id,
             gcalEventId: oldAppointment.gcalEventId,
-          }
+          },
         );
         // Continua mesmo se falhar
       }
@@ -390,7 +381,7 @@ class AppointmentService {
           appointmentId: newAppointment.id,
           newStart,
           newEnd,
-        }
+        },
       );
       // Não lança erro para não impedir o reagendamento
     }
@@ -453,7 +444,7 @@ class AppointmentService {
         calendarEvent: calendarEvent ? "existe mas sem ID" : "null",
       });
       throw new Error(
-        "Falha ao criar evento no Google Calendar: evento não foi criado ou não possui ID"
+        "Falha ao criar evento no Google Calendar: evento não foi criado ou não possui ID",
       );
     }
 
@@ -473,10 +464,13 @@ class AppointmentService {
       },
     });
 
-    this.logger.info("Agendamento atualizado com ID do evento do Google Calendar", {
-      appointmentId: appointment.id,
-      calendarEventId: calendarEvent.id,
-    });
+    this.logger.info(
+      "Agendamento atualizado com ID do evento do Google Calendar",
+      {
+        appointmentId: appointment.id,
+        calendarEventId: calendarEvent.id,
+      },
+    );
   }
 }
 

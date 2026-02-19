@@ -7,14 +7,14 @@ services:
     environment:
       NODE_ENV: ${NODE_ENV:-production}
       PORT: ${PORT:-4041}
-      DATABASE_URL: ${DATABASE_URL:-postgres://postgres:Artestofados2026.123@72.61.218.112:5432/artestofados_db?sslmode=disable}
+      DATABASE_URL: ${DATABASE_URL:-postgresql://artestofados:artestofados25@localhost:5432/estofados_db}
       JWT_SECRET: ${JWT_SECRET:-default-jwt-secret-key-must-be-at-least-32-characters-long-for-security}
       JWT_EXPIRES_IN: ${JWT_EXPIRES_IN:-7d}
       WHATSAPP_SESSION_PATH: ${WHATSAPP_SESSION_PATH:-./whatsapp-sessions}
       OPENAI_API_KEY: ${OPENAI_API_KEY:-}
       GOOGLE_API_CREDENTIALS: ${GOOGLE_API_CREDENTIALS:-}
       GOOGLE_CALENDAR_ID: ${GOOGLE_CALENDAR_ID:-primary}
-      FRONTEND_URL: ${FRONTEND_URL:-http://72.61.218.112:4040}
+      FRONTEND_URL: ${FRONTEND_URL:-localhost:4040}
     ports:
       - "${PORT:-4041}:4041"
     volumes:

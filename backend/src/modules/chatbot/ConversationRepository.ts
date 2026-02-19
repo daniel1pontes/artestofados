@@ -1,21 +1,19 @@
 import {
-  PrismaClient,
   Prisma,
   ConversationRole,
   ConversationSession,
   ConversationMessage,
   ConversationState,
 } from "@prisma/client";
+import { prisma } from "../../lib/prisma";
 
 export type ConversationWithMessages = ConversationSession & {
   messages: ConversationMessage[];
 };
 
-const prisma = new PrismaClient();
-
 export class ConversationRepository {
   async findOrCreateByPhone(
-    phoneNumber: string
+    phoneNumber: string,
   ): Promise<ConversationWithMessages> {
     let session = await prisma.conversationSession.findUnique({
       where: { phoneNumber },
@@ -45,7 +43,7 @@ export class ConversationRepository {
 
   async updateSession(
     sessionId: string,
-    data: Prisma.ConversationSessionUpdateInput
+    data: Prisma.ConversationSessionUpdateInput,
   ): Promise<void> {
     await prisma.conversationSession.update({
       where: { id: sessionId },
@@ -56,7 +54,7 @@ export class ConversationRepository {
   async appendMessage(
     conversationId: string,
     role: ConversationRole,
-    content: string
+    content: string,
   ): Promise<void> {
     await prisma.conversationMessage.create({
       data: {
@@ -79,7 +77,7 @@ export class ConversationRepository {
   async pauseConversation(
     phoneNumber: string,
     hours: number = 2,
-    reason: string = "HUMAN_INTERVENTION"
+    reason: string = "HUMAN_INTERVENTION",
   ): Promise<void> {
     const pausedUntil = new Date();
     pausedUntil.setHours(pausedUntil.getHours() + hours);
@@ -151,7 +149,7 @@ export class ConversationRepository {
 
     const now = new Date();
     const remainingMs = session.pausedUntil.getTime() - now.getTime();
-    
+
     if (remainingMs <= 0) {
       return null;
     }
@@ -159,4 +157,3 @@ export class ConversationRepository {
     return Math.ceil(remainingMs / (1000 * 60)); // retorna em minutos
   }
 }
-

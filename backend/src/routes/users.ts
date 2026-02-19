@@ -1,6 +1,6 @@
 import { Router } from "express";
 import bcrypt from "bcryptjs";
-import { prisma } from "../app";
+import { prisma } from "../lib/prisma";
 import { authenticateToken, requireAdmin } from "../middleware/auth";
 import { createError } from "../middleware/errorHandler";
 
@@ -213,7 +213,7 @@ router.delete(
     } catch (error) {
       next(error);
     }
-  }
+  },
 );
 
 export default router;

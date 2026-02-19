@@ -1,9 +1,7 @@
 import { Client, LocalAuth, Message } from "whatsapp-web.js";
-import { PrismaClient } from "@prisma/client";
+import { prisma } from "../lib/prisma";
 import QRCode from "qrcode";
 import ChatbotOrchestratorService from "./ChatbotOrchestratorService";
-
-const prisma = new PrismaClient();
 
 class WhatsAppService {
   private client: Client | null = null;
@@ -128,7 +126,9 @@ class WhatsAppService {
       }
 
       // Extrair número do telefone
-      const phoneNumber = message.from.replace("@c.us", "").replace("@g.us", "");
+      const phoneNumber = message.from
+        .replace("@c.us", "")
+        .replace("@g.us", "");
 
       // NOVA LÓGICA: Detectar interferência humana
       // Se a mensagem foi enviada pelo número conectado (fromMe = true),
@@ -140,11 +140,13 @@ class WhatsAppService {
       }
 
       // NOVA LÓGICA: Verificar se a conversa está pausada
-      const isPaused = await this.chatbotOrchestrator.isConversationPaused(phoneNumber);
+      const isPaused =
+        await this.chatbotOrchestrator.isConversationPaused(phoneNumber);
       if (isPaused) {
-        const remainingMinutes = await this.chatbotOrchestrator.getPauseTimeRemaining(phoneNumber);
+        const remainingMinutes =
+          await this.chatbotOrchestrator.getPauseTimeRemaining(phoneNumber);
         console.log(
-          `⏸️ Conversa pausada para ${phoneNumber}. Tempo restante: ${remainingMinutes} minutos`
+          `⏸️ Conversa pausada para ${phoneNumber}. Tempo restante: ${remainingMinutes} minutos`,
         );
         return; // Não responder, chatbot está pausado
       }
@@ -157,7 +159,7 @@ class WhatsAppService {
         messageBody = messageBody || "";
         messageBody += " [IMAGEM ENVIADA]";
         console.log(
-          `Processando mensagem com mídia de ${message.from}: ${messageBody}`
+          `Processando mensagem com mídia de ${message.from}: ${messageBody}`,
         );
       }
 
@@ -170,7 +172,7 @@ class WhatsAppService {
       // Processar mensagem usando o orquestrador (que cria agendamentos automaticamente)
       const response = await this.chatbotOrchestrator.processMessage(
         phoneNumber,
-        messageBody
+        messageBody,
       );
 
       // Enviar resposta
@@ -193,7 +195,7 @@ class WhatsAppService {
   private async updateDatabaseStatus(
     status: string,
     qrCode?: string,
-    phoneNumber?: string | null
+    phoneNumber?: string | null,
   ) {
     try {
       await prisma.whatsappConn.upsert({
@@ -227,7 +229,7 @@ class WhatsAppService {
     if (this.connectionAttempts > this.maxConnectionAttempts) {
       this.connectionAttempts = 0; // Resetar para próximas tentativas
       throw new Error(
-        "Número máximo de tentativas de conexão atingido. Por favor, tente novamente em alguns minutos."
+        "Número máximo de tentativas de conexão atingido. Por favor, tente novamente em alguns minutos.",
       );
     }
 
@@ -275,7 +277,7 @@ class WhatsAppService {
         error.originalMessage?.includes("context was destroyed")
       ) {
         console.log(
-          "Tentando reconstruir cliente devido a erro de contexto/versão..."
+          "Tentando reconstruir cliente devido a erro de contexto/versão...",
         );
         this.client = null;
         this.qrCode = null;
@@ -325,7 +327,7 @@ class WhatsAppService {
         const sessionPath = path.join(
           process.cwd(),
           ".wwebjs_auth",
-          "session-main-session"
+          "session-main-session",
         );
 
         if (fs.existsSync(sessionPath)) {
@@ -397,15 +399,12 @@ class WhatsAppService {
     try {
       // Pausar por 2 horas
       await this.chatbotOrchestrator.pauseConversation(phoneNumber, 2);
-      
+
       console.log(
-        `✅ Chatbot pausado por 2 horas para ${phoneNumber} devido à interferência humana`
+        `✅ Chatbot pausado por 2 horas para ${phoneNumber} devido à interferência humana`,
       );
     } catch (error) {
-      console.error(
-        `Erro ao pausar chatbot para ${phoneNumber}:`,
-        error
-      );
+      console.error(`Erro ao pausar chatbot para ${phoneNumber}:`, error);
     }
   }
 
